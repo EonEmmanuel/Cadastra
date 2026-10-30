@@ -1,0 +1,43 @@
+{
+  "plan_id": "KRI-BEA-2024-ERR-004",
+  "title_number": "TF 9102/Ocean",
+  "owner_name": "Consortium Touristique du Sud",
+  "locality": "Kribi - Mpalla Littoral",
+  "region": "Sud",
+  "division": "Océan",
+  "surveyor_name": "Cabinet Topographique Non-Agréé",
+  "surveyor_order_number": "INVALIDE",
+  "utm_zone": "32N",
+  "stated_area_sqm": 2500.0,
+  "date_surveyed": "2024-05-02",
+  "beacons": [
+    {
+      "borne_id": "B1",
+      "x": 605100.00,
+      "y": 325100.00,
+      "z": 5.0,
+      "description": "Borne Nord-Ouest"
+    },
+    {
+      "borne_id": "B2",
+      "x": 605200.00,
+      "y": 325000.00,
+      "z": 4.5,
+      "description": "Borne Sud-Est (croisement anormal)"
+    },
+    {
+      "borne_id": "B3",
+      "x": 605200.00,
+      "y": 325100.00,
+      "z": 4.8,
+      "description": "Borne Nord-Est"
+    },
+    {
+      "borne_id": "B4",
+      "x": 605100.00,
+      "y": 325000.00,
+      "z": 5.2,
+      "description": "Borne Sud-Ouest"
+    }
+  ]
+}

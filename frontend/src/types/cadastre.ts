@@ -1,0 +1,98 @@
+export type UTMZone = "32N" | "33N";
+
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL_FRAUD";
+
+export interface BeaconInput {
+  borne_id: string;
+  x: number;
+  y: number;
+  z?: number;
+  description?: string;
+}
+
+export interface BeaconWGS84 {
+  borne_id: string;
+  utm_x: number;
+  utm_y: number;
+  latitude: number;
+  longitude: number;
+  elevation_m?: number;
+  description?: string;
+}
+
+export interface BoundarySegment {
+  from_borne: string;
+  to_borne: string;
+  length_meters: number;
+  bearing_degrees?: number;
+}
+
+export interface PlanVerificationRequest {
+  plan_id: string;
+  title_number?: string;
+  owner_name?: string;
+  locality: string;
+  region: string;
+  division?: string;
+  surveyor_name?: string;
+  surveyor_order_number?: string;
+  utm_zone: UTMZone;
+  stated_area_sqm: number;
+  date_surveyed?: string;
+  beacons: BeaconInput[];
+}
+
+export interface PlanVerificationResponse {
+  plan_id: string;
+  is_valid: boolean;
+  superficie_fictive_detected: boolean;
+  stated_area_sqm: number;
+  computed_area_sqm: number;
+  discrepancy_sqm: number;
+  discrepancy_percentage: number;
+  tolerance_passed: boolean;
+  polygon_closed: boolean;
+  self_intersecting: boolean;
+  perimeter_m: number;
+  centroid_utm: { x: number; y: number };
+  centroid_wgs84: { latitude: number; longitude: number };
+  utm_zone: string;
+  epsg_code: string;
+  beacons_wgs84: BeaconWGS84[];
+  boundary_segments: BoundarySegment[];
+  risk_score: number;
+  risk_level: RiskLevel;
+  fraud_indicators: string[];
+  recommendations_fr: string[];
+  recommendations_en: string[];
+  verification_hash: string;
+  timestamp: string;
+}
+
+export interface CadastralProfileSummary {
+  filename: string;
+  plan_id: string;
+  title_number?: string;
+  owner_name?: string;
+  locality: string;
+  region: string;
+  utm_zone: UTMZone;
+  stated_area_sqm: number;
+  num_beacons: number;
+}
+
+export interface TableBoundingBox {
+  ymin: number;
+  xmin: number;
+  ymax: number;
+  xmax: number;
+}
+
+export interface PlanExtractionResponse {
+  extracted_plan: PlanVerificationRequest;
+  confidence_score: number;
+  sam3_table_roi: TableBoundingBox;
+  muse_spark_structured_fields: Record<string, any>;
+  detected_language: string;
+  notes: string;
+}

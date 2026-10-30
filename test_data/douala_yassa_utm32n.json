@@ -1,0 +1,43 @@
+{
+  "plan_id": "DLA-YAS-2024-001",
+  "title_number": "TF 48291/Wouri",
+  "owner_name": "Tchamba Ndongo Jean-Pierre",
+  "locality": "Douala - Yassa (Zone Résidentielle)",
+  "region": "Littoral",
+  "division": "Wouri",
+  "surveyor_name": "Ing. Géomètre Ekotto Martin (OGEC #142)",
+  "surveyor_order_number": "OGEC-142",
+  "utm_zone": "32N",
+  "stated_area_sqm": 980.0,
+  "date_surveyed": "2024-03-15",
+  "beacons": [
+    {
+      "borne_id": "B1",
+      "x": 583420.00,
+      "y": 446100.00,
+      "z": 24.5,
+      "description": "Borne béton d'angle Nord-Ouest"
+    },
+    {
+      "borne_id": "B2",
+      "x": 583455.00,
+      "y": 446100.00,
+      "z": 24.8,
+      "description": "Borne béton d'angle Nord-Est"
+    },
+    {
+      "borne_id": "B3",
+      "x": 583455.00,
+      "y": 446072.00,
+      "z": 25.1,
+      "description": "Borne béton d'angle Sud-Est"
+    },
+    {
+      "borne_id": "B4",
+      "x": 583420.00,
+      "y": 446072.00,
+      "z": 24.9,
+      "description": "Borne béton d'angle Sud-Ouest"
+    }
+  ]
+}

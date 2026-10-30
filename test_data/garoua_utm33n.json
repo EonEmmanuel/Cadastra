@@ -1,0 +1,43 @@
+{
+  "plan_id": "GAR-ROU-2024-005",
+  "title_number": "TF 3041/Benoue",
+  "owner_name": "Oumarou Bouba Sali",
+  "locality": "Garoua - Roumde Adjia",
+  "region": "Nord",
+  "division": "Bénoué",
+  "surveyor_name": "Ing. Géomètre Bello Ahmadou (OGEC #205)",
+  "surveyor_order_number": "OGEC-205",
+  "utm_zone": "33N",
+  "stated_area_sqm": 2000.0,
+  "date_surveyed": "2024-01-18",
+  "beacons": [
+    {
+      "borne_id": "B1",
+      "x": 324200.00,
+      "y": 1028400.00,
+      "z": 210.0,
+      "description": "Borne béton d'angle Nord-Ouest"
+    },
+    {
+      "borne_id": "B2",
+      "x": 324250.00,
+      "y": 1028400.00,
+      "z": 210.2,
+      "description": "Borne béton d'angle Nord-Est"
+    },
+    {
+      "borne_id": "B3",
+      "x": 324250.00,
+      "y": 1028360.00,
+      "z": 210.5,
+      "description": "Borne béton d'angle Sud-Est"
+    },
+    {
+      "borne_id": "B4",
+      "x": 324200.00,
+      "y": 1028360.00,
+      "z": 210.3,
+      "description": "Borne béton d'angle Sud-Ouest"
+    }
+  ]
+}

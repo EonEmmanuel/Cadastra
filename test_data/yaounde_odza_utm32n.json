@@ -1,0 +1,50 @@
+{
+  "plan_id": "YDE-ODZ-2024-003",
+  "title_number": "TF 18920/Mfoundi",
+  "owner_name": "Mballa Onguene Marie-Claire",
+  "locality": "Yaoundé - Odza (Borne 12)",
+  "region": "Centre",
+  "division": "Mfoundi",
+  "surveyor_name": "Ing. Géomètre Atangana Paul (OGEC #088)",
+  "surveyor_order_number": "OGEC-088",
+  "utm_zone": "32N",
+  "stated_area_sqm": 2100.0,
+  "date_surveyed": "2024-02-20",
+  "beacons": [
+    {
+      "borne_id": "B1",
+      "x": 778910.00,
+      "y": 425120.00,
+      "z": 712.0,
+      "description": "Borne d'angle Ouest"
+    },
+    {
+      "borne_id": "B2",
+      "x": 778945.00,
+      "y": 425135.00,
+      "z": 715.0,
+      "description": "Borne d'angle Nord"
+    },
+    {
+      "borne_id": "B3",
+      "x": 778965.00,
+      "y": 425105.00,
+      "z": 714.5,
+      "description": "Borne d'angle Est"
+    },
+    {
+      "borne_id": "B4",
+      "x": 778935.00,
+      "y": 425080.00,
+      "z": 710.0,
+      "description": "Borne d'angle Sud"
+    },
+    {
+      "borne_id": "B5",
+      "x": 778900.00,
+      "y": 425095.00,
+      "z": 709.0,
+      "description": "Borne d'angle Sud-Ouest"
+    }
+  ]
+}
