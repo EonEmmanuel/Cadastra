@@ -10,6 +10,9 @@ import re
 import io
 import json
 import base64
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -17,6 +20,10 @@ from dotenv import load_dotenv
 import httpx
 from PIL import Image, ImageOps
 from pydantic import ValidationError
+try:
+    from pypdf import PdfReader
+except ImportError:  # Clear runtime error below when an environment is incomplete.
+    PdfReader = None
 
 # Load backend/.env (git-ignored) so a plain "uvicorn backend.main:app" run
 # picks up META_API_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID and
@@ -104,6 +111,19 @@ CADASTRA_EXTRACTION_SYSTEM_PROMPT = (
 CADASTRA_EXTRACTION_USER_PROMPT = (
     "Extrais les bornes géodésiques (identifiants, X, Y) et la superficie déclarée de ce plan cadastral, "
     "puis localise le tableau de coordonnées. Retourne uniquement le JSON du schéma."
+)
+
+CADASTRA_EDITABLE_PDF_SYSTEM_PROMPT = (
+    "Tu es l'agent d'extraction cadastrale pour le Cameroun (MINDCAF). "
+    "Le contenu fourni provient directement de la couche texte d'un PDF éditable, "
+    "et non d'une OCR. Extrais le plan et le tableau de bornes sans modifier les "
+    "chiffres, sans compléter une valeur absente et sans inventer une décimale. "
+    "Réponds UNIQUEMENT avec le JSON demandé."
+)
+
+CADASTRA_EDITABLE_PDF_USER_PROMPT = (
+    "Voici le texte extrait directement du PDF. Identifie le plan, la localité, le "
+    "fuseau UTM, la superficie déclarée et les bornes ordonnées.\n\n"
 )
 
 # Zoom recheck pass: second Spark call on the grounded table crop.
@@ -537,6 +557,94 @@ async def _recheck_beacons_via_chat_completions(crop_bytes: bytes) -> Dict[str, 
     return json.loads(raw_text)
 
 
+def _parse_sam_table_box(output_text: str, width: int, height: int) -> TableBoundingBox:
+    """Parse and validate the SAM 3.1 box grammar for one still image."""
+    match = re.search(
+        r"<\|box;x1=(\d+);y1=(\d+);x2=(\d+);y2=(\d+);w=(\d+);h=(\d+)(?:;c=[\d.]+)?\|>",
+        output_text,
+    )
+    if not match:
+        raise RuntimeError("SAM 3.1 n'a renvoyé aucune boîte de segmentation exploitable.")
+    left, top, right, bottom, response_width, response_height = map(int, match.groups())
+    if response_width != width or response_height != height or right <= left or bottom <= top:
+        raise RuntimeError("Boîte SAM incohérente avec les dimensions de l'image.")
+    return TableBoundingBox(
+        xmin=left / width,
+        ymin=top / height,
+        xmax=right / width,
+        ymax=bottom / height,
+    )
+
+
+async def _refine_table_roi_with_sam(
+    content_bytes: bytes, media_type: str, roi: TableBoundingBox
+) -> TableBoundingBox:
+    """Refine Spark's semantic table box with a real SAM 3.1 box prompt.
+
+    Muse Spark identifies which region is the cadastral coordinate table. SAM
+    3.1 then receives that region as a pixel box prompt and returns a
+    pixel-precise table boundary plus its segmentation mask. This workflow uses
+    the returned box to make a tighter source-image crop for the digit-reading
+    pass; the API response keeps both model outputs distinct.
+    """
+    try:
+        image = ImageOps.exif_transpose(Image.open(io.BytesIO(content_bytes)))
+        width, height = image.size
+    except Exception as exc:
+        raise RuntimeError(f"Image illisible pour le raffinement SAM: {exc}")
+
+    x1 = max(0, min(width - 1, int(roi.xmin * width)))
+    y1 = max(0, min(height - 1, int(roi.ymin * height)))
+    x2 = max(x1 + 1, min(width, int(roi.xmax * width)))
+    y2 = max(y1 + 1, min(height, int(roi.ymax * height)))
+    # SAM's documented box-prompt grammar uses displayed, EXIF-corrected media
+    # dimensions. The image has already been normalized before this stage.
+    box_prompt = f"<0f>1<|box;x1={x1};y1={y1};x2={x2};y2={y2};w={width};h={height}|>"
+    encoded_image = base64.b64encode(content_bytes).decode("utf-8")
+    output_deltas: List[str] = []
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        async with client.stream(
+            "POST",
+            f"{META_API_BASE_URL}/v1/responses",
+            headers=_meta_json_headers(),
+            json={
+                "model": META_VISION_MODEL_ID,
+                "input": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": box_prompt},
+                        {"type": "input_image", "image_url": f"data:{media_type};base64,{encoded_image}"},
+                    ],
+                }],
+                "stream": True,
+                # SAM metadata is string-valued; boolean JSON here is ignored by
+                # the API instead of requesting the confidence field.
+                "metadata": {"mask_encoding": "one_bit", "include_confidence": "true"},
+            },
+        ) as response:
+            if response.status_code != 200:
+                body = (await response.aread()).decode("utf-8", errors="replace")
+                raise RuntimeError(f"SAM 3.1 a répondu {response.status_code}: {body[:180]}")
+            async for line in response.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if not payload or payload == "[DONE]":
+                    continue
+                try:
+                    event = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                delta = event.get("delta")
+                if isinstance(delta, str):
+                    output_deltas.append(delta)
+
+    # SAM emits geometry in the streamed output-text lane. The mask remains
+    # part of that real response; the crop operation needs the refined box.
+    return _parse_sam_table_box("".join(output_deltas), width, height)
+
+
 def _crop_table_region(content_bytes: bytes, roi: TableBoundingBox) -> bytes:
     """Crop the grounded coordinates-table region from the exact uploaded frame.
 
@@ -590,6 +698,89 @@ def _normalize_image_bytes(content_bytes: bytes, media_type: str) -> tuple[bytes
         img.convert("RGB").save(out, format="JPEG", quality=92)
         return out.getvalue(), "image/jpeg"
     return content_bytes, media_type
+
+
+def _extract_embedded_pdf_text(content_bytes: bytes) -> str:
+    """Read a born-digital PDF text layer without applying OCR."""
+    if PdfReader is None:
+        raise RuntimeError(
+            "Le support des PDF éditables nécessite pypdf. Installez les dépendances backend."
+        )
+    try:
+        reader = PdfReader(io.BytesIO(content_bytes))
+        return "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    except Exception as exc:
+        raise RuntimeError(f"Texte PDF non extractible: {exc}")
+
+
+def _has_usable_embedded_coordinate_text(text: str) -> bool:
+    """Require several coordinate-like rows before trusting a PDF text layer."""
+    if len(re.sub(r"\s+", "", text)) < 120:
+        return False
+    coordinate_rows = re.findall(
+        r"(?:B(?:orne)?\s*[A-Za-z0-9]+|\d+)\s*[:=,\-]?\s*\d{4,7}(?:[.,]\d+)?\s*[,;/\s]+\d{4,7}(?:[.,]\d+)?",
+        text,
+        re.IGNORECASE,
+    )
+    return len(coordinate_rows) >= 3
+
+
+def _render_scanned_pdf_first_page(content_bytes: bytes, dpi: int = 350) -> bytes:
+    """Rasterize page one of a scan at OCR-safe resolution with Poppler."""
+    renderer = shutil.which("pdftoppm")
+    if not renderer:
+        raise RuntimeError("Le moteur Poppler pdftoppm est introuvable pour rendre le PDF scanné.")
+    # Some Windows sandbox configurations deny Python's global temp directory.
+    # A project-local ignored directory is writable for the backend and still
+    # cleaned after every conversion.
+    runtime_temp_root = Path(__file__).resolve().parent / ".cadastra_runtime_tmp"
+    runtime_temp_root.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="pdf_", dir=runtime_temp_root) as temp_dir:
+        temp_path = Path(temp_dir)
+        source = temp_path / "source.pdf"
+        output_prefix = temp_path / "page"
+        source.write_bytes(content_bytes)
+        try:
+            completed = subprocess.run(
+                [renderer, "-f", "1", "-l", "1", "-r", str(dpi), "-png", str(source), str(output_prefix)],
+                capture_output=True,
+                text=True,
+                timeout=45,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Le rendu du PDF scanné a dépassé le délai autorisé.") from exc
+        rendered_pages = list(temp_path.glob("page-*.png"))
+        if completed.returncode != 0 or not rendered_pages:
+            detail = (completed.stderr or completed.stdout or "erreur inconnue")[:180]
+            raise RuntimeError(f"Impossible de rendre le PDF scanné: {detail}")
+        return rendered_pages[0].read_bytes()
+
+
+async def _extract_editable_pdf_text(text: str) -> Dict[str, Any]:
+    """Ask Spark to structure direct PDF text, never to visually read a scan."""
+    # Keep payload bounded while preserving the beginning, where plan metadata
+    # and most coordinate tables normally appear.
+    source_text = text[:60000]
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(
+            f"{META_API_BASE_URL}/v1/chat/completions",
+            headers=_meta_json_headers(),
+            json={
+                "model": META_EXTRACT_MODEL_ID,
+                "messages": [
+                    {"role": "system", "content": CADASTRA_EDITABLE_PDF_SYSTEM_PROMPT},
+                    {"role": "user", "content": CADASTRA_EDITABLE_PDF_USER_PROMPT + source_text},
+                ],
+                "response_format": PLAN_EXTRACTION_JSON_FORMAT,
+            },
+        )
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erreur Meta Model API {response.status_code}: {response.text[:300]}",
+        )
+    return json.loads(response.json()["choices"][0]["message"]["content"])
 
 
 async def _extract_via_files_api(content_bytes: bytes, filename: str, media_type: str) -> tuple[Dict[str, Any], str]:
@@ -668,10 +859,10 @@ async def extract_plan_from_document(
 ):
     """Extract structured beacon data via the real Meta Model API (Muse Spark).
 
-    Muse Spark reads the plan image (or PDF page-images via the Files API),
+    Muse Spark reads the plan image or direct text from an editable PDF,
     extracts the beacon table AND grounds the coordinate-table box on the
-    normalized 0-1000 grid. SAM 3.1 remains available on the same key for
-    pixel-accurate segmentation. NO simulation: without MODEL_API_KEY the
+    normalized 0-1000 grid. SAM 3.1 then refines that table boundary for the
+    pixel-accurate zoom crop. NO simulation: without MODEL_API_KEY the
     endpoint returns 503 instead of placeholder data.
     """
     if not RUNTIME_CONFIG.get("meta_api_key"):
@@ -693,17 +884,44 @@ async def extract_plan_from_document(
     try:
         content_bytes = await file.read()
         media_type = file.content_type or "application/octet-stream"
+        document_source = "uploaded-image"
+        embedded_text_characters = 0
         # EXIF-orient inline photos first: the grounding box is expressed on the
         # exact pixel frame we upload, while browsers display the rotated
         # variant. Same frame = the zoom recheck crop lines up with what the
         # model actually saw.
         if media_type in INLINE_IMAGE_MIME_TYPES:
             content_bytes, media_type = _normalize_image_bytes(content_bytes, media_type)
-        parsed, protocol_used = await call_spark_extraction(
-            content_bytes,
-            media_type,
-            file.filename or "plan.jpg",
-        )
+            parsed, protocol_used = await call_spark_extraction(
+                content_bytes,
+                media_type,
+                file.filename or "plan.jpg",
+            )
+        elif media_type == "application/pdf":
+            embedded_text = _extract_embedded_pdf_text(content_bytes)
+            embedded_text_characters = len(embedded_text)
+            if _has_usable_embedded_coordinate_text(embedded_text):
+                parsed = await _extract_editable_pdf_text(embedded_text)
+                protocol_used = "editable-pdf-text"
+                document_source = "embedded-pdf-text"
+            else:
+                # A scanned PDF has no trustworthy selectable coordinate text.
+                # Render page one at 350 DPI, then follow the identical image
+                # pipeline so Spark grounding, SAM, and the zoom recheck work.
+                content_bytes = _render_scanned_pdf_first_page(content_bytes)
+                media_type = "image/png"
+                parsed, protocol_used = await call_spark_extraction(
+                    content_bytes,
+                    media_type,
+                    "rendered-page-1.png",
+                )
+                document_source = "scanned-pdf-page-1-350dpi"
+        else:
+            parsed, protocol_used = await call_spark_extraction(
+                content_bytes,
+                media_type,
+                file.filename or "plan.bin",
+            )
     except HTTPException:
         raise
     except (json.JSONDecodeError, ValidationError, KeyError, ValueError, TypeError) as exc:
@@ -735,10 +953,20 @@ async def extract_plan_from_document(
     # model returned a grounding box; any failure degrades gracefully to the
     # first-pass reading and is reported honestly.
     zoom_status = "skipped"
+    sam_status = "skipped"
+    sam_table_roi: Optional[TableBoundingBox] = None
     table_crop_data_url: Optional[str] = None
     if protocol_used == "chat-completions" and table_roi is not None:
         try:
-            crop_bytes = _crop_table_region(content_bytes, table_roi)
+            sam_table_roi = await _refine_table_roi_with_sam(content_bytes, media_type, table_roi)
+            sam_status = "applied"
+        except Exception as exc:
+            # SAM is a refinement stage, not a reason to discard a successful
+            # Spark extraction. Keep the original grounding crop as fallback.
+            sam_status = f"failed: {str(exc)[:120]}"
+
+        try:
+            crop_bytes = _crop_table_region(content_bytes, sam_table_roi or table_roi)
             zoom_result = await _recheck_beacons_via_chat_completions(crop_bytes)
             zoom_beacons = zoom_result.get("beacons") if isinstance(zoom_result, dict) else None
             # Only adopt the zoom reading when it found the same number of rows —
@@ -772,16 +1000,23 @@ async def extract_plan_from_document(
         "provider": "Meta Model API",
         "model_id": META_EXTRACT_MODEL_ID,
         "protocol": protocol_used,
+        "document_source": document_source,
+        "embedded_text_characters": embedded_text_characters,
         "beacons_extracted_count": len(extracted_request.beacons),
         "viewing_projection": f"UTM {extracted_request.utm_zone.value}",
         "vision_model_id": META_VISION_MODEL_ID,
         "grounding_grid": "0-1000 (Muse Spark perception grounding)",
+        "sam_3_1": {
+            "model_id": META_VISION_MODEL_ID,
+            "table_refinement": sam_status,
+        },
         "zoom_recheck": zoom_status,
         "live_api_call": True,
     }
     return PlanExtractionResponse(
         extracted_plan=extracted_request,
         table_roi=table_roi,
+        sam_table_roi=sam_table_roi,
         table_crop_data_url=table_crop_data_url,
         spark_structured_fields=structured_fields,
         notes="Extraction en direct via Meta Model API (Muse Spark).",

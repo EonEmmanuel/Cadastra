@@ -98,6 +98,9 @@ class PlanExtractionResponse(BaseModel):
     # No locally-injected confidence score or segmentation box — no simulated data.
     confidence_score: Optional[float] = None
     table_roi: Optional[TableBoundingBox] = None
+    # Pixel-precise table boundary returned by SAM 3.1 after it refines Muse
+    # Spark's semantic grounding. It stays separate for transparent provenance.
+    sam_table_roi: Optional[TableBoundingBox] = None
     # Lossless PNG data URL of the grounded table crop, present only when the
     # visual-zoom recheck actually ran on a real crop of the uploaded frame.
     table_crop_data_url: Optional[str] = None

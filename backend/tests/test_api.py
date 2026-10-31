@@ -252,13 +252,13 @@ def test_api_extract_zoom_recheck_corrects_beacons(client, monkeypatch):
     assert data["extracted_plan"]["beacons"][2]["x"] == 583455.0
 
 
-def test_api_extract_pdf_routes_through_files_api(client, monkeypatch):
-    """PDF: jamais d'image_url inline — Files API + Responses API uniquement."""
+def test_api_extract_scanned_pdf_renders_then_uses_image_pipeline(client, monkeypatch):
+    """A scanned PDF renders at high DPI before the Spark/SAM image path."""
     monkeypatch.setitem(main.RUNTIME_CONFIG, "meta_api_key", "test-key")
 
-    async def fake_files_extract(content_bytes, filename, media_type):
-        assert media_type == "application/pdf"
-        assert filename == "plan.pdf"
+    async def fake_image_extract(content_bytes, media_type, filename="plan.png"):
+        assert media_type == "image/png"
+        assert filename == "rendered-page-1.png"
         return {
             "plan_id": "EXTRACT-PDF-01",
             "locality": "Douala Yassa",
@@ -270,13 +270,11 @@ def test_api_extract_pdf_routes_through_files_api(client, monkeypatch):
                 {"borne_id": "B2", "x": 583455.0, "y": 446100.0},
                 {"borne_id": "B3", "x": 583455.0, "y": 446072.0},
             ],
-        }, "responses-files-api"
+        }, "chat-completions"
 
-    async def must_not_be_called(*args, **kwargs):
-        raise AssertionError("PDF must not use the inline chat-completions image path")
-
-    monkeypatch.setattr(main, "_extract_via_files_api", fake_files_extract)
-    monkeypatch.setattr(main, "_extract_via_chat_completions", must_not_be_called)
+    monkeypatch.setattr(main, "_extract_embedded_pdf_text", lambda _: "")
+    monkeypatch.setattr(main, "_render_scanned_pdf_first_page", lambda _: b"rendered-png")
+    monkeypatch.setattr(main, "call_spark_extraction", fake_image_extract)
     response = client.post(
         "/api/extract",
         files={"file": ("plan.pdf", b"%PDF-1.4 test", "application/pdf")},
@@ -284,7 +282,7 @@ def test_api_extract_pdf_routes_through_files_api(client, monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["extracted_plan"]["plan_id"] == "EXTRACT-PDF-01"
-    assert data["spark_structured_fields"]["protocol"] == "responses-files-api"
+    assert data["spark_structured_fields"]["document_source"] == "scanned-pdf-page-1-350dpi"
 
 
 def test_whatsapp_webhook_verification(client):

@@ -100,6 +100,9 @@ Hackerton-Project/
 ### 1. Prerequisites
 - Python 3.12+ (or use the configured virtual environment in `backend/.venv`)
 - Node.js 18+ and npm
+- Poppler (`pdftoppm`) for high-resolution rendering of scanned PDFs. Editable
+  PDFs use their embedded text layer directly; scanned PDFs render page one at
+  350 DPI before the Muse Spark + SAM 3.1 image pipeline.
 
 ### 2. Backend Setup & Test Execution
 ```bash

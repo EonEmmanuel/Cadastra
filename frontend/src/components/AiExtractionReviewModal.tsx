@@ -140,6 +140,21 @@ export default function AiExtractionReviewModal({
                       </span>
                     </div>
                   )}
+                  {previewData.samTableRoi && (
+                    <div
+                      className="absolute border-2 border-sky-400 bg-sky-400/5 pointer-events-none"
+                      style={{
+                        left: `${previewData.samTableRoi.xmin * 100}%`,
+                        top: `${previewData.samTableRoi.ymin * 100}%`,
+                        width: `${Math.max(0, (previewData.samTableRoi.xmax - previewData.samTableRoi.xmin) * 100)}%`,
+                        height: `${Math.max(0, (previewData.samTableRoi.ymax - previewData.samTableRoi.ymin) * 100)}%`,
+                      }}
+                    >
+                      <span className="absolute -bottom-5 left-0 px-1.5 py-0.5 rounded bg-sky-400 text-black text-[9px] font-mono font-bold whitespace-nowrap">
+                        SAM 3.1 · limite segmentée
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -192,6 +207,14 @@ export default function AiExtractionReviewModal({
                       : "boîte non renvoyée par le modèle"}
                   </span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sky-400">SAM 3.1</span>
+                  <span className="text-zinc-500">
+                    {previewData?.samSegmentation === "applied"
+                      ? "segmentation de la limite du tableau appliquée"
+                      : previewData?.samSegmentation ?? "non exécutée"}
+                  </span>
+                </div>
                 <p className="text-zinc-500 text-[9px]">
                   {[
                     previewData?.protocol === "chat-completions"
@@ -199,6 +222,12 @@ export default function AiExtractionReviewModal({
                       : null,
                     previewData?.protocol === "responses-files-api"
                       ? "Protocole : Files API + sorties structurées"
+                      : null,
+                    previewData?.documentSource === "embedded-pdf-text"
+                      ? "Source : texte PDF éditable (sans OCR)"
+                      : null,
+                    previewData?.documentSource === "scanned-pdf-page-1-350dpi"
+                      ? "Source : PDF scanné rendu à 350 DPI"
                       : null,
                     previewData?.detectedLanguage ? `Langue : ${previewData.detectedLanguage}` : null,
                   ]

@@ -77,8 +77,15 @@ export default function LandingHero({
             previewUrl: URL.createObjectURL(file),
             previewKind: file.type.startsWith("image/") ? "image" : "pdf",
             tableRoi: data.table_roi ?? null,
+            samTableRoi: data.sam_table_roi ?? null,
             cropUrl:
               typeof data.table_crop_data_url === "string" ? data.table_crop_data_url : null,
+            samSegmentation:
+              typeof structured.sam_3_1?.table_refinement === "string"
+                ? structured.sam_3_1.table_refinement
+                : null,
+            documentSource:
+              typeof structured.document_source === "string" ? structured.document_source : null,
             zoomRecheck:
               typeof structured.zoom_recheck === "string" ? structured.zoom_recheck : null,
             protocol: structured.protocol ?? null,

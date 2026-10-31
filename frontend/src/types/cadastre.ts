@@ -92,6 +92,7 @@ export interface PlanExtractionResponse {
   extracted_plan: PlanVerificationRequest;
   confidence_score: number | null;
   table_roi: TableBoundingBox | null;
+  sam_table_roi: TableBoundingBox | null;
   table_crop_data_url: string | null;
   spark_structured_fields: Record<string, any>;
   detected_language: string | null;
@@ -105,7 +106,10 @@ export interface PlanExtractionPreview {
   previewUrl: string;
   previewKind: "image" | "pdf";
   tableRoi: TableBoundingBox | null;
+  samTableRoi: TableBoundingBox | null;
   cropUrl: string | null;
+  samSegmentation: string | null;
+  documentSource: string | null;
   zoomRecheck: string | null;
   protocol: string | null;
   detectedLanguage: string | null;
