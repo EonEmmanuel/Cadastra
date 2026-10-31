@@ -350,7 +350,7 @@ export default function CadastralSatelliteMapInner({
                     <div className="font-bold text-xs text-[#00DF8F]">Borne {b.borne_id}</div>
                     <div className="text-[11px] text-zinc-300">X (Est): {b.utm_x.toFixed(2)} m</div>
                     <div className="text-[11px] text-zinc-300">Y (Nord): {b.utm_y.toFixed(2)} m</div>
-                    {b.elevation_m !== undefined && (
+                    {b.elevation_m != null && (
                       <div className="text-[10px] text-zinc-500">Altitude: {b.elevation_m.toFixed(1)} m</div>
                     )}
                   </div>

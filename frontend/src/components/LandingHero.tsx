@@ -40,11 +40,20 @@ export default function LandingHero({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Step 1: attach the file to the composer (no auto-fire — the user presses send).
+  const handleAttachFile = (file: File) => {
+    setAttachedFile(file);
+    setExtractError(null);
+  };
+
+  // Step 2: send → run the real Muse Spark extraction on the attached file.
   const handleFileUpload = async (file: File) => {
     setIsProcessing(true);
     setAttachedFile(file);
+    setExtractError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -56,29 +65,31 @@ export default function LandingHero({
 
       if (res.ok) {
         const data = await res.json();
-        onPlanLoaded(data.extracted_plan, file.name);
-      } else {
-        // Open review modal with an empty plan ready for user input
-        const emptyPlan: PlanVerificationRequest = {
-          plan_id: file.name.replace(/\.[^/.]+$/, "").toUpperCase(),
-          locality: "Cameroun",
-          region: "Littoral",
-          utm_zone: "32N",
-          stated_area_sqm: 0,
-          beacons: [],
-        };
-        onPlanLoaded(emptyPlan, file.name);
+        if (data?.extracted_plan) {
+          onPlanLoaded(data.extracted_plan, file.name);
+          setAttachedFile(null);
+          return;
+        }
+        setExtractError("Le serveur n'a renvoyé aucune donnée exploitable pour ce fichier.");
+        return;
       }
+
+      // Surface the real backend reason — never silently dump the user
+      // into the manual-entry modal on failure.
+      let detail = `Erreur serveur ${res.status}`;
+      try {
+        const err = await res.json();
+        if (err?.detail) {
+          detail = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+        }
+      } catch {
+        // Response body was not JSON — keep the status-code detail.
+      }
+      setExtractError(`Extraction IA impossible — ${detail}`);
     } catch {
-      const emptyPlan: PlanVerificationRequest = {
-        plan_id: file.name.replace(/\.[^/.]+$/, "").toUpperCase(),
-        locality: "Cameroun",
-        region: "Littoral",
-        utm_zone: "32N",
-        stated_area_sqm: 0,
-        beacons: [],
-      };
-      onPlanLoaded(emptyPlan, file.name);
+      setExtractError(
+        "Impossible de joindre le serveur d'analyse (http://localhost:8000). Vérifiez que le backend est démarré puis réessayez."
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -98,11 +109,13 @@ export default function LandingHero({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload(e.dataTransfer.files[0]);
+      handleAttachFile(e.dataTransfer.files[0]);
     }
   };
 
   const handlePromptSubmit = () => {
+    if (isProcessing) return;
+
     if (attachedFile) {
       handleFileUpload(attachedFile);
       return;
@@ -329,6 +342,42 @@ export default function LandingHero({
                         </button>
                       </div>
                     )}
+
+                    {/* Inline status while the AI extraction runs */}
+                    {isProcessing && (
+                      <div className="flex items-center gap-2 mt-2 text-xs text-zinc-300">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
+                        <span>Analyse du plan en cours via Muse Spark…</span>
+                      </div>
+                    )}
+
+                    {/* Inline extraction error with explicit recovery choices
+                        (manual entry is a choice, never a silent fallback) */}
+                    {extractError && (
+                      <div className="mt-2 rounded-xl border border-red-400/30 bg-red-500/[0.08] px-3.5 py-2.5">
+                        <p className="text-xs text-red-300 leading-relaxed">{extractError}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => attachedFile && handleFileUpload(attachedFile)}
+                            className="px-2.5 py-1 rounded-lg bg-white/[0.08] border border-white/[0.12] text-[11px] text-zinc-200 hover:bg-white/[0.14] transition"
+                          >
+                            Réessayer l'extraction
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExtractError(null);
+                              setAttachedFile(null);
+                              onOpenManualModal();
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-white/[0.08] border border-white/[0.12] text-[11px] text-zinc-200 hover:bg-white/[0.14] transition"
+                          >
+                            Saisie manuelle
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Hidden Real File Input */}
@@ -339,7 +388,7 @@ export default function LandingHero({
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        handleFileUpload(e.target.files[0]);
+                        handleAttachFile(e.target.files[0]);
                       }
                     }}
                   />

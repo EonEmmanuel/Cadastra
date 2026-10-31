@@ -16,7 +16,7 @@ export interface BeaconWGS84 {
   utm_y: number;
   latitude: number;
   longitude: number;
-  elevation_m?: number;
+  elevation_m?: number | null;
   description?: string;
 }
 
