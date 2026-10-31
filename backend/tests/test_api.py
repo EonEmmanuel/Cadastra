@@ -2,12 +2,35 @@
 
 import pytest
 from fastapi.testclient import TestClient
+
+import main
 from main import app, WHATSAPP_VERIFY_TOKEN
 
 
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+WHATSAPP_TEXT_MESSAGE_PAYLOAD = {
+    "entry": [
+        {
+            "changes": [
+                {
+                    "value": {
+                        "messages": [
+                            {
+                                "from": "237691234567",
+                                "type": "text",
+                                "text": {"body": "Vérifier plan Douala Yassa"},
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}
 
 
 def test_health_check(client):
@@ -234,3 +257,63 @@ def test_whatsapp_delivery_receipt_status(client):
     data = response.json()
     assert data["success"] is True
     assert "Accusé de réception" in data["reply_message"]
+
+
+def test_whatsapp_send_skipped_without_cloud_credentials(client, monkeypatch):
+    """Sans token Cloud API configuré, aucun appel Graph API ne doit être tenté."""
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "whatsapp_token", "")
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "phone_number_id", "")
+    calls = []
+
+    def fake_send(recipient, payload):
+        calls.append(("send", recipient, payload))
+        return True
+
+    def fake_upload(pdf_bytes, filename):
+        calls.append(("upload", filename))
+        return "fake-media-id"
+
+    monkeypatch.setattr(main, "send_whatsapp_message", fake_send)
+    monkeypatch.setattr(main, "upload_whatsapp_media", fake_upload)
+
+    response = client.post("/api/webhook/whatsapp", json=WHATSAPP_TEXT_MESSAGE_PAYLOAD)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["cloud_api_text_sent"] is False
+    assert data["cloud_api_document_sent"] is False
+    assert calls == []  # no Graph API side effects in local sandbox mode
+
+
+def test_whatsapp_outbound_push_with_cloud_credentials(client, monkeypatch):
+    """Avec identifiants Cloud API : push texte puis certificat PDF (upload media + send)."""
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "whatsapp_token", "test-bearer-token")
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "phone_number_id", "987654321")
+    sent = []
+
+    def fake_send(recipient, payload):
+        sent.append((recipient, payload))
+        return True
+
+    def fake_upload(pdf_bytes, filename):
+        assert pdf_bytes[:4] == b"%PDF"  # a real generated audit certificate
+        assert filename.startswith("Cadastra_Audit_")
+        return "fake-media-id"
+
+    monkeypatch.setattr(main, "send_whatsapp_message", fake_send)
+    monkeypatch.setattr(main, "upload_whatsapp_media", fake_upload)
+
+    response = client.post("/api/webhook/whatsapp", json=WHATSAPP_TEXT_MESSAGE_PAYLOAD)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cloud_api_text_sent"] is True
+    assert data["cloud_api_document_sent"] is True
+    assert len(sent) == 2
+    # 1st push: the text verdict to the citizen
+    assert sent[0][0] == "237691234567"
+    assert sent[0][1]["type"] == "text"
+    assert "CADASTRA-CAMEROON" in sent[0][1]["text"]["body"]
+    # 2nd push: the PDF certificate uploaded and referenced by media id
+    assert sent[1][1]["type"] == "document"
+    assert sent[1][1]["document"]["id"] == "fake-media-id"
+    assert sent[1][1]["document"]["filename"].endswith(".pdf")

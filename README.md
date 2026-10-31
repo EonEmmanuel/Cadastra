@@ -72,7 +72,7 @@ Hackerton-Project/
 │   ├── pdf_report.py              # ReportLab bilingual PDF audit certificate generator
 │   ├── requirements.txt           # Python dependencies
 │   ├── schemas.py                 # Pydantic v2 validation models
-│   └── tests/                     # 30 Pytest unit & integration tests
+│   └── tests/                     # 32 Pytest unit & integration tests
 │       ├── test_api.py            # API endpoints & WhatsApp webhook tests
 │       ├── test_engine.py         # UTM 32N/33N conversion & Shoelace area tests
 │       └── test_fraud_detection.py# Superficie fictive & tolerance tests
@@ -104,7 +104,7 @@ Hackerton-Project/
 ### 2. Backend Setup & Test Execution
 ```bash
 # From workspace root
-# Run all 30 unit and integration tests
+# Run all 32 unit and integration tests
 backend\.venv\Scripts\pytest backend/tests -v
 
 # Start the FastAPI server (Port 8000)

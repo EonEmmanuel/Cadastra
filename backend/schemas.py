@@ -112,3 +112,7 @@ class WhatsAppVerificationResponse(BaseModel):
     reply_message: str
     pdf_report_url: Optional[str] = None
     verification_summary: Optional[PlanVerificationResponse] = None
+    # True only when the reply was actually pushed to the citizen through the
+    # WhatsApp Cloud API send endpoint (None / False in local dev without keys).
+    cloud_api_text_sent: Optional[bool] = None
+    cloud_api_document_sent: Optional[bool] = None

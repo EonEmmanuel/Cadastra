@@ -7,10 +7,19 @@ Meta Global AI Developer Hackathon submission.
 from __future__ import annotations
 import os
 import re
+import io
 import json
+import base64
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
+from dotenv import load_dotenv
+import httpx
+
+# Load backend/.env (git-ignored) so a plain "uvicorn backend.main:app" run
+# picks up META_LLAMA_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID and
+# WHATSAPP_VERIFY_TOKEN without extra configuration.
+load_dotenv()
 from fastapi import FastAPI, HTTPException, Query, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -58,6 +67,72 @@ RUNTIME_CONFIG = {
     "meta_llama_key": os.getenv("META_LLAMA_KEY", ""),
     "webhook_url": "http://localhost:8000/api/webhook/whatsapp",
 }
+
+
+# --- WhatsApp Cloud API outbound push (Graph API) ---
+
+GRAPH_API_BASE = "https://graph.facebook.com"
+GRAPH_API_VERSION = "v23.0"
+
+
+def upload_whatsapp_media(pdf_bytes: bytes, filename: str) -> Optional[str]:
+    """Upload a locally-generated PDF audit certificate to WhatsApp media storage.
+
+    Returns the media_id on success, or None when credentials are missing or the
+    upload fails, so the reply flow degrades gracefully to text-only.
+    """
+    token = RUNTIME_CONFIG.get("whatsapp_token") or ""
+    phone_number_id = RUNTIME_CONFIG.get("phone_number_id") or ""
+    if not token or not phone_number_id:
+        return None
+
+    url = f"{GRAPH_API_BASE}/{GRAPH_API_VERSION}/{phone_number_id}/media"
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            response = client.post(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                data={"messaging_product": "whatsapp"},
+                files={"file": (filename, io.BytesIO(pdf_bytes), "application/pdf")},
+            )
+            response.raise_for_status()
+            return response.json().get("id")
+    except Exception as exc:
+        print(f"[WhatsApp] Media upload failed: {exc}")
+        return None
+
+
+def send_whatsapp_message(recipient: str, message_payload: Dict[str, Any]) -> bool:
+    """Push a message to a citizen via `POST /{phone_number_id}/messages`.
+
+    Meta discards the webhook's HTTP response body, so replies MUST be pushed
+    explicitly through this endpoint — a webhook that only returns JSON would
+    leave the citizen with no response at all.
+    """
+    token = RUNTIME_CONFIG.get("whatsapp_token") or ""
+    phone_number_id = RUNTIME_CONFIG.get("phone_number_id") or ""
+    if not token or not phone_number_id:
+        return False
+
+    url = f"{GRAPH_API_BASE}/{GRAPH_API_VERSION}/{phone_number_id}/messages"
+    body: Dict[str, Any] = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": recipient,
+        **message_payload,
+    }
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                json=body,
+            )
+            response.raise_for_status()
+            return True
+    except Exception as exc:
+        print(f"[WhatsApp] Send failed for {recipient}: {exc}")
+        return False
 
 
 @app.get("/api/config")
@@ -415,13 +490,40 @@ def handle_whatsapp_message(payload: Dict[str, Any]):
         f"Dossier : {verification.plan_id}\n\n"
         f"{verdict_str}\n\n"
         f"{details}\n\n"
-        f"📄 Téléchargez le certificat officiel PDF avec empreinte cryptographique SHA-256 :\n"
-        f"https://cadastra.cm/report/{verification.plan_id}"
+        f"📄 Le certificat PDF officiel avec empreinte SHA-256 est joint ci-dessous."
     )
+
+    # Outbound Cloud API push: uncommented only when real credentials are set.
+    # Without them the webhook still returns 200 + structured JSON so the local
+    # UI / simulator keeps working during development.
+    cloud_text_sent = False
+    cloud_document_sent = False
+    if RUNTIME_CONFIG.get("whatsapp_token") and RUNTIME_CONFIG.get("phone_number_id"):
+        cloud_text_sent = send_whatsapp_message(
+            sender, {"type": "text", "text": {"body": reply_text}}
+        )
+        if cloud_text_sent:
+            pdf_filename = f"Cadastra_Audit_{verification.plan_id}.pdf"
+            pdf_bytes: Optional[bytes] = None
+            try:
+                pdf_bytes = generate_cadastral_pdf(verification, plan_req)
+            except Exception:
+                pdf_bytes = None
+            media_id = upload_whatsapp_media(pdf_bytes, pdf_filename) if pdf_bytes else None
+            if media_id:
+                cloud_document_sent = send_whatsapp_message(
+                    sender,
+                    {
+                        "type": "document",
+                        "document": {"id": media_id, "filename": pdf_filename},
+                    },
+                )
 
     return WhatsAppVerificationResponse(
         success=True,
         reply_message=reply_text,
         pdf_report_url=f"/api/report/pdf?plan_id={verification.plan_id}",
         verification_summary=verification,
+        cloud_api_text_sent=cloud_text_sent,
+        cloud_api_document_sent=cloud_document_sent,
     )
