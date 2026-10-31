@@ -90,9 +90,20 @@ export interface TableBoundingBox {
 
 export interface PlanExtractionResponse {
   extracted_plan: PlanVerificationRequest;
-  confidence_score: number;
-  sam3_table_roi: TableBoundingBox;
-  muse_spark_structured_fields: Record<string, any>;
-  detected_language: string;
-  notes: string;
+  confidence_score: number | null;
+  table_roi: TableBoundingBox | null;
+  spark_structured_fields: Record<string, any>;
+  detected_language: string | null;
+  notes: string | null;
+}
+
+// Real provenance of a live extraction, passed from the hero to the review
+// modal so it can render the actual uploaded document with the actual
+// Muse Spark grounding box (never simulated).
+export interface PlanExtractionPreview {
+  previewUrl: string;
+  previewKind: "image" | "pdf";
+  tableRoi: TableBoundingBox | null;
+  protocol: string | null;
+  detectedLanguage: string | null;
 }

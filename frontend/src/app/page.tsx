@@ -13,6 +13,7 @@ import CustomPlanModal from "@/components/CustomPlanModal";
 import {
   PlanVerificationRequest,
   PlanVerificationResponse,
+  PlanExtractionPreview,
 } from "@/types/cadastre";
 import { verifyCadastralPlanLocally } from "@/utils/geodesy";
 
@@ -41,6 +42,7 @@ export default function CadastraApp() {
   const [isAiReviewOpen, setIsAiReviewOpen] = useState(false);
   const [pendingExtraction, setPendingExtraction] = useState<PlanVerificationRequest | null>(null);
   const [pendingFileName, setPendingFileName] = useState<string>("");
+  const [extractionPreview, setExtractionPreview] = useState<PlanExtractionPreview | null>(null);
 
   const [isApiSettingsOpen, setIsApiSettingsOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -86,9 +88,14 @@ export default function CadastraApp() {
 
   // When a plan is uploaded or submitted from the Landing Hero:
   // Open the Human-in-the-Loop AI Vision Review Modal first
-  const handlePlanLoadedFromHero = (plan: PlanVerificationRequest, fileName: string) => {
+  const handlePlanLoadedFromHero = (
+    plan: PlanVerificationRequest,
+    fileName: string,
+    preview: PlanExtractionPreview | null
+  ) => {
     setPendingExtraction(plan);
     setPendingFileName(fileName);
+    setExtractionPreview(preview);
     setIsAiReviewOpen(true);
   };
 
@@ -227,6 +234,7 @@ export default function CadastraApp() {
           onClose={() => setIsAiReviewOpen(false)}
           extractedPlan={pendingExtraction}
           uploadedFileName={pendingFileName}
+          previewData={extractionPreview}
           onConfirm={handleConfirmAiReview}
         />
       )}

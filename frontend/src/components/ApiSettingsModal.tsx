@@ -252,7 +252,7 @@ export default function ApiSettingsModal({
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Connecte directement vos plans à <strong>Meta Muse Spark 1.3</strong> et <strong>SAM 3.1</strong> sur <code className="text-zinc-300">https://api.meta.ai/v1</code> pour extraire les bornes depuis vos images en direct.
+                Connecte directement vos plans à <strong>Meta Muse Spark 1.3</strong> sur <code className="text-zinc-300">https://api.meta.ai/v1</code> pour extraire les bornes depuis vos images en direct.
               </p>
               <input
                 type="password"

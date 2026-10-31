@@ -12,13 +12,14 @@ import {
   ShieldCheck,
   Edit3,
 } from "lucide-react";
-import { PlanVerificationRequest, BeaconInput } from "@/types/cadastre";
+import { PlanVerificationRequest, BeaconInput, PlanExtractionPreview } from "@/types/cadastre";
 
 interface AiExtractionReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   extractedPlan: PlanVerificationRequest;
   uploadedFileName?: string;
+  previewData?: PlanExtractionPreview | null;
   onConfirm: (confirmedPlan: PlanVerificationRequest) => void;
 }
 
@@ -27,6 +28,7 @@ export default function AiExtractionReviewModal({
   onClose,
   extractedPlan,
   uploadedFileName = "plan_cadastral_scan.jpg",
+  previewData = null,
   onConfirm,
 }: AiExtractionReviewModalProps) {
   const [locality, setLocality] = useState(extractedPlan.locality);
@@ -98,64 +100,87 @@ export default function AiExtractionReviewModal({
 
           {/* Body: Split View (Document Scan Preview + Interactive Human-in-the-Loop Review) */}
           <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column (5 cols): Cadastral Plan Visual Preview */}
+            {/* Left Column (5 cols): The user's actual document + the real
+                Muse Spark grounding box (normalized 0-1000 grid, 0,0 = top-left).
+                No simulated blueprint, no invented rows. */}
             <div className="lg:col-span-5 space-y-3 flex flex-col">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-[#00DF8F]" />
-                  Aperçu du Plan Numérisé
+                  Document analysé par Muse Spark
                 </span>
-                <span className="text-[10px] font-mono text-zinc-500">MINDCAF Scan</span>
+                <span className="text-[10px] font-mono text-zinc-500">
+                  {previewData?.previewKind === "pdf" ? "PDF SOURCE" : "IMAGE SOURCE"}
+                </span>
               </div>
 
-              {/* Simulated Document Blueprint with SAM 3.1 Bounding Box */}
-              <div className="relative rounded-2xl overflow-hidden bg-[#0D1017] ring-1 ring-white/[0.08] p-4 flex-1 min-h-[280px] flex flex-col justify-between">
-                {/* Blueprint grid pattern */}
-                <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#00DF8F_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+              {previewData?.previewKind === "image" && (
+                <div className="relative rounded-2xl overflow-hidden bg-[#0D1017] ring-1 ring-white/[0.08] flex-1 min-h-[280px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewData.previewUrl}
+                    alt="Plan cadastral importé"
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
 
-                {/* Stamp & Official Seal */}
-                <div className="relative z-10 flex justify-between items-start text-[10px] font-mono">
-                  <div className="p-2 rounded-lg bg-white/[0.04] text-zinc-400 space-y-0.5">
-                    <p className="text-white font-bold">RÉPUBLIQUE DU CAMEROUN</p>
-                    <p>MINDCAF · Service du Cadastre</p>
-                    <p>Département du Wouri</p>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-[#00DF8F] font-bold ring-1 ring-emerald-500/20 text-[9px]">
-                    VISA GÉOMÈTRE AGRÉÉ
-                  </div>
+                  {/* Real grounding box returned by Muse Spark */}
+                  {previewData.tableRoi && (
+                    <div
+                      className="absolute border-2 border-[#00DF8F] bg-[#00DF8F]/5 pointer-events-none"
+                      style={{
+                        left: `${previewData.tableRoi.xmin / 10}%`,
+                        top: `${previewData.tableRoi.ymin / 10}%`,
+                        width: `${Math.max(0, (previewData.tableRoi.xmax - previewData.tableRoi.xmin) / 10)}%`,
+                        height: `${Math.max(0, (previewData.tableRoi.ymax - previewData.tableRoi.ymin) / 10)}%`,
+                      }}
+                    >
+                      <span className="absolute -top-5 left-0 px-1.5 py-0.5 rounded bg-[#00DF8F] text-black text-[9px] font-mono font-bold whitespace-nowrap">
+                        Tableau des bornes
+                      </span>
+                    </div>
+                  )}
                 </div>
+              )}
 
-                {/* Polygonal Scheme Graphic */}
-                <div className="relative z-10 my-4 flex items-center justify-center">
-                  <div className="w-36 h-28 relative border-2 border-dashed border-[#00DF8F]/60 rounded-xl bg-[#00DF8F]/5 flex items-center justify-center">
-                    <span className="text-[10px] font-mono text-[#00DF8F] font-bold">
-                      {statedArea} m²
-                    </span>
-                    <div className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-md bg-[#00DF8F] text-black text-[9px] font-bold flex items-center justify-center">
-                      B1
-                    </div>
-                    <div className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-md bg-[#00DF8F] text-black text-[9px] font-bold flex items-center justify-center">
-                      B2
-                    </div>
-                    <div className="absolute -bottom-2.5 -right-2.5 w-5 h-5 rounded-md bg-[#00DF8F] text-black text-[9px] font-bold flex items-center justify-center">
-                      B3
-                    </div>
-                    <div className="absolute -bottom-2.5 -left-2.5 w-5 h-5 rounded-md bg-[#00DF8F] text-black text-[9px] font-bold flex items-center justify-center">
-                      B4
-                    </div>
-                  </div>
+              {previewData?.previewKind === "pdf" && (
+                <div className="relative rounded-2xl overflow-hidden bg-[#0D1017] ring-1 ring-white/[0.08] flex-1 min-h-[280px]">
+                  <iframe
+                    src={previewData.previewUrl}
+                    title="Plan cadastral importé (PDF)"
+                    className="absolute inset-0 w-full h-full bg-white"
+                  />
                 </div>
+              )}
 
-                {/* SAM 3.1 Detection Tag */}
-                <div className="relative z-10 p-2.5 rounded-xl bg-white/[0.03] text-[10px] font-mono text-zinc-400 space-y-1">
-                  <div className="flex items-center justify-between text-[#00DF8F]">
-                    <span>Segmentation SAM 3.1</span>
-                    <span className="text-zinc-500">ROI: [0.08, 0.62, 0.92, 0.91]</span>
-                  </div>
-                  <p className="text-zinc-500 text-[9px]">
-                    Tableau de bornage isolé avec signature et sceau officiel détectés.
-                  </p>
+              {!previewData && (
+                <div className="rounded-2xl overflow-hidden bg-[#0D1017] ring-1 ring-white/[0.08] flex-1 min-h-[280px] flex items-center justify-center px-6 text-center text-xs text-zinc-500">
+                  Aucune prévisualisation du document joint.
                 </div>
+              )}
+
+              {/* Real provenance facts only — nothing simulated */}
+              <div className="p-2.5 rounded-xl bg-white/[0.03] text-[10px] font-mono text-zinc-400 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#00DF8F]">Grounding Muse Spark</span>
+                  <span className="text-zinc-500">
+                    {previewData?.tableRoi
+                      ? `ROI [x ${Math.round(previewData.tableRoi.xmin)}–${Math.round(previewData.tableRoi.xmax)} · y ${Math.round(previewData.tableRoi.ymin)}–${Math.round(previewData.tableRoi.ymax)}] / 1000`
+                      : "boîte non renvoyée par le modèle"}
+                  </span>
+                </div>
+                <p className="text-zinc-500 text-[9px]">
+                  {[
+                    previewData?.protocol === "chat-completions"
+                      ? "Protocole : vision en ligne (Chat Completions)"
+                      : null,
+                    previewData?.protocol === "responses-files-api"
+                      ? "Protocole : Files API + sorties structurées"
+                      : null,
+                    previewData?.detectedLanguage ? `Langue : ${previewData.detectedLanguage}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "Extraction structurée via Meta Model API"}
+                </p>
               </div>
             </div>
 
@@ -168,7 +193,10 @@ export default function AiExtractionReviewModal({
                   <span>Validation Assistée par IA (Human-in-the-Loop)</span>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed font-normal">
-                  L&apos;IA a extrait les données du plan papier avec un taux de concordance de 97.8%. Veuillez vérifier ou rectifier les champs ci-dessous avant l&apos;exécution du calcul géodésique Gauss-Shoelace.
+                  Muse Spark (Meta Model API) a extrait{" "}
+                  <span className="text-[#00DF8F] font-semibold">{beacons.length} bornes</span> depuis
+                  votre document. Vérifiez ou corrigez chaque valeur ci-dessous avant de lancer le
+                  calcul géodésique Gauss-Shoelace et l&apos;audit anti-fraude.
                 </p>
               </div>
 

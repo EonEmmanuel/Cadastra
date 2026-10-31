@@ -13,7 +13,7 @@ import {
   X,
   FileEdit,
 } from "lucide-react";
-import { PlanVerificationRequest } from "@/types/cadastre";
+import { PlanVerificationRequest, PlanExtractionPreview } from "@/types/cadastre";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,11 @@ import { WaveformVisualizer } from "@/components/ui/waveform-visualizer";
 import { PartnerLogos } from "@/components/ui/partner-logos";
 
 interface LandingHeroProps {
-  onPlanLoaded: (plan: PlanVerificationRequest, fileName: string) => void;
+  onPlanLoaded: (
+    plan: PlanVerificationRequest,
+    fileName: string,
+    preview: PlanExtractionPreview | null
+  ) => void;
   onOpenManualModal: () => void;
   onOpenDashboard: () => void;
   onOpenWhatsAppModal: () => void;
@@ -66,7 +70,17 @@ export default function LandingHero({
       if (res.ok) {
         const data = await res.json();
         if (data?.extracted_plan) {
-          onPlanLoaded(data.extracted_plan, file.name);
+          // Real extraction provenance: the actual file preview plus the actual
+          // Muse Spark grounding box — never simulated.
+          const structured = data.spark_structured_fields ?? {};
+          const preview: PlanExtractionPreview = {
+            previewUrl: URL.createObjectURL(file),
+            previewKind: file.type.startsWith("image/") ? "image" : "pdf",
+            tableRoi: data.table_roi ?? null,
+            protocol: structured.protocol ?? null,
+            detectedLanguage: data.detected_language ?? null,
+          };
+          onPlanLoaded(data.extracted_plan, file.name, preview);
           setAttachedFile(null);
           return;
         }
@@ -251,7 +265,7 @@ export default function LandingHero({
 
         {/* Subtitle */}
         <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mt-5 leading-relaxed font-normal">
-          Audit géodésique autonome, segmentation SAM 3.1, extraction Muse Spark et détection instantanée des fraudes foncières au Cameroun. Optimisé pour les géomètres qui bâtissent l&apos;avenir.
+          Audit géodésique autonome, extraction structurée des bornes par Muse Spark (Meta Model API), projection de Snyder et détection instantanée des fraudes foncières au Cameroun. Optimisé pour les géomètres qui bâtissent l&apos;avenir.
         </p>
 
         {/* Two Real Action Buttons (No dummy demo triggers) */}
@@ -401,7 +415,7 @@ export default function LandingHero({
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         className="p-2 sm:px-3 sm:py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition flex items-center gap-2 text-xs font-medium"
-                        title="Importer une image de plan (SAM 3.1 + Muse Spark)"
+                        title="Importer une image de plan (extraction Muse Spark)"
                       >
                         <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
                         <span className="hidden sm:inline">Image</span>
@@ -525,7 +539,7 @@ export default function LandingHero({
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-zinc-200">Plan Cadastral Numérisé</span>
               <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-mono text-zinc-400">
-                Muse Spark · SAM 3.1
+                Muse Spark · Meta Model API
               </span>
             </div>
 
@@ -535,7 +549,7 @@ export default function LandingHero({
             <div className="space-y-1">
               <h4 className="text-xs font-semibold text-white">Extraction instantanée du bornage.</h4>
               <p className="text-[11px] text-zinc-400 leading-relaxed font-normal">
-                Meta SAM 3.1 isole le tableau des coordonnées géodésiques, Muse Spark numérise les bornes sans saisie manuelle.
+                Muse Spark (Meta Model API) localise le tableau des bornes et numérise les coordonnées en direct, sans saisie manuelle.
               </p>
             </div>
           </Card>
