@@ -238,11 +238,11 @@ export default function LandingHero({
 
         {/* Subtitle */}
         <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mt-5 leading-relaxed font-normal">
-          Audit géodésique autonome, segmentation multimodale Llama 3.2 et détection instantanée des fraudes foncières au Cameroun. Optimisé pour les géomètres qui bâtissent l&apos;avenir.
+          Audit géodésique autonome, segmentation SAM 3.1, extraction Muse Spark et détection instantanée des fraudes foncières au Cameroun. Optimisé pour les géomètres qui bâtissent l&apos;avenir.
         </p>
 
         {/* Two Real Action Buttons (No dummy demo triggers) */}
-        <div className="flex items-center gap-3 mt-7 mb-4">
+        <div className="flex items-center gap-3 mt-6 mb-4">
           <Button
             variant="primary"
             size="lg"
@@ -262,124 +262,172 @@ export default function LandingHero({
           </Button>
         </div>
 
-        {/* 3. DOTTED MATRIX DOME + LUMINOUS WAVEFORM */}
-        <div className="relative w-full max-w-3xl mt-8 flex flex-col items-center">
-          <HalftoneDome />
+        {/* 3. HERO STAGE: BACKGROUND DOME + LARGE DECORATED AI INPUT DIRECTLY UNDER */}
+        <div className="relative w-full max-w-4xl mt-3 pb-24 flex flex-col items-center">
+          {/* Halftone Dome as backdrop: lifted up so its curved stipple crown arches above the card */}
+          <div className="absolute -top-14 inset-x-0 flex justify-center pointer-events-none z-0">
+            <HalftoneDome />
+          </div>
 
-          {/* 4. THE AI MODE INPUT FIELD (Clean, Zero Dummy Data) */}
+          {/* 4. LARGE, DECORATED AI MODE INPUT FIELD (Directly Under, Sized & Decorated) */}
           <div
             id="audit"
-            className="relative w-full max-w-2xl mx-auto -mt-32 sm:-mt-40 z-20 text-left space-y-3"
+            className="relative z-10 w-full max-w-3xl mx-auto mt-4 text-left space-y-3.5"
           >
-            {/* Multi-Color Ambient Glow Ring */}
-            <div className="relative group">
-              <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-r from-blue-500/35 via-emerald-400/35 via-purple-500/35 to-amber-400/35 blur-md opacity-85 group-hover:opacity-100 group-focus-within:opacity-100 transition duration-500 pointer-events-none" />
+            {/* Multi-Color Ambient Glow Ring + Rainbow Gradient Frame */}
+            <div className="relative group w-full">
+              {/* Outer Rainbow Multi-Color Atmospheric Glow Halo */}
+              <div className="absolute -inset-1 sm:-inset-1.5 rounded-[34px] bg-gradient-to-r from-sky-400 via-teal-300 via-emerald-400 via-amber-300 via-orange-400 via-rose-500 to-indigo-500 blur-xl opacity-75 group-hover:opacity-95 transition duration-500 pointer-events-none" />
+              <div className="absolute -inset-0.5 rounded-[32px] bg-gradient-to-r from-sky-400 via-teal-300 via-emerald-400 via-amber-300 via-orange-400 via-rose-500 to-indigo-500 blur-sm opacity-90 pointer-events-none" />
 
-              {/* The Input Card Container */}
+              {/* The Input Card Container with 1.5px Rainbow Frame */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`relative rounded-3xl bg-[#0B0D12]/95 border transition-all duration-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),_0_24px_48px_-12px_rgba(0,0,0,0.85)] backdrop-blur-2xl p-4 sm:p-5 flex flex-col justify-between min-h-[125px] ${
-                  isDragging
-                    ? "border-white bg-white/[0.08]"
-                    : "border-white/[0.12] hover:border-white/[0.22]"
+                className={`relative rounded-[32px] p-[1.5px] bg-gradient-to-r from-sky-400 via-teal-300 via-emerald-400 via-amber-300 via-orange-400 via-rose-500 to-indigo-500 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.9)] transition-all duration-300 ${
+                  isDragging ? "scale-[1.01]" : ""
                 }`}
               >
-                {/* Top: Text Input / Query */}
-                <div className="w-full flex-1">
-                  <input
-                    type="text"
-                    value={promptText}
-                    onChange={(e) => setPromptText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Poser une question, coller des coordonnées, ou glisser un plan cadastral (PDF ou Image)..."
-                    className="w-full bg-transparent text-sm sm:text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none font-normal selection:bg-white/20"
-                  />
+                {/* Inner Card Glass Surface */}
+                <div className="relative rounded-[30.5px] bg-[#0A0D14]/95 backdrop-blur-2xl p-6 sm:p-7 flex flex-col justify-between min-h-[165px] sm:min-h-[185px]">
+                  {/* Subtle inner rainbow wash along the bottom edge */}
+                  <div className="absolute inset-x-0 bottom-0 h-16 rounded-b-[30px] bg-gradient-to-t from-white/[0.03] to-transparent pointer-events-none" />
+                  <div className="absolute inset-x-12 bottom-0 h-[2px] bg-gradient-to-r from-sky-400/30 via-amber-300/40 via-orange-400/40 to-indigo-500/30 blur-[1px] pointer-events-none" />
 
-                  {/* Attached File Pill Preview if file dropped/selected */}
-                  {attachedFile && (
-                    <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-lg bg-white/[0.06] border border-white/[0.1] text-xs text-zinc-300">
-                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="font-mono truncate max-w-[200px]">
-                        {attachedFile.name}
-                      </span>
-                      <button
-                        onClick={() => setAttachedFile(null)}
-                        className="text-zinc-500 hover:text-white"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  {/* Top: Text Input / Query */}
+                  <div className="w-full flex-1">
+                    <textarea
+                      rows={2}
+                      value={promptText}
+                      onChange={(e) => setPromptText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handlePromptSubmit();
+                        }
+                      }}
+                      placeholder="Poser une question, saisir des coordonnées géodésiques, ou glisser un plan cadastral (Image ou PDF)..."
+                      className="w-full bg-transparent text-base sm:text-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none font-normal leading-relaxed selection:bg-white/20"
+                    />
 
-                {/* Hidden Real File Input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,.pdf,.json"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleFileUpload(e.target.files[0]);
-                    }
-                  }}
-                />
-
-                {/* Bottom Row: Actions Bar */}
-                <div className="flex items-center justify-between pt-3 mt-2 border-t border-white/[0.05]">
-                  {/* Left: Attachment & Upload Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition flex items-center gap-1.5 text-xs font-medium"
-                      title="Importer une image de plan (Llama 3.2 Vision)"
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      <span className="hidden sm:inline">Image</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition flex items-center gap-1.5 text-xs font-medium"
-                      title="Joindre un document PDF ou fichier de bornage"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                      <span className="hidden sm:inline">PDF</span>
-                    </button>
+                    {/* Attached File Pill Preview if file dropped/selected */}
+                    {attachedFile && (
+                      <div className="inline-flex items-center gap-2 mt-2 px-3.5 py-1.5 rounded-xl bg-white/[0.08] border border-white/[0.12] text-xs text-zinc-200 shadow-sm">
+                        <FileText className="w-4 h-4 text-emerald-400" />
+                        <span className="font-mono truncate max-w-[240px]">
+                          {attachedFile.name}
+                        </span>
+                        <span className="text-[10px] text-zinc-400">
+                          ({(attachedFile.size / 1024).toFixed(0)} KB)
+                        </span>
+                        <button
+                          onClick={() => setAttachedFile(null)}
+                          className="text-zinc-400 hover:text-white ml-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Right: Mic & Circular Upward Arrow Submit Button */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={onOpenWhatsAppModal}
-                      className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition"
-                      title="Audit via WhatsApp Cloud API"
-                    >
-                      <Mic className="w-4 h-4" />
-                    </button>
+                  {/* Hidden Real File Input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleFileUpload(e.target.files[0]);
+                      }
+                    }}
+                  />
 
-                    {/* Circular Action Button with Arrow Up */}
-                    <button
-                      type="button"
-                      onClick={handlePromptSubmit}
-                      disabled={isProcessing}
-                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white flex items-center justify-center transition shadow-lg active:scale-95 disabled:opacity-40"
-                      title="Lancer l'analyse du plan"
-                    >
-                      {isProcessing ? (
-                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      ) : (
-                        <ArrowUp className="w-4 h-4 text-white stroke-[2.5]" />
-                      )}
-                    </button>
+                  {/* Bottom Row: Actions Bar */}
+                  <div className="flex items-center justify-between pt-4 mt-2 border-t border-white/[0.06] relative z-10">
+                    {/* Left: Attachment & Upload Actions */}
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 sm:px-3 sm:py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition flex items-center gap-2 text-xs font-medium"
+                        title="Importer une image de plan (SAM 3.1 + Muse Spark)"
+                      >
+                        <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                        <span className="hidden sm:inline">Image</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 sm:px-3 sm:py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition flex items-center gap-2 text-xs font-medium"
+                        title="Joindre un document PDF ou fichier de bornage"
+                      >
+                        <Paperclip className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                        <span className="hidden sm:inline">PDF</span>
+                      </button>
+                    </div>
+
+                    {/* Right: Mic & Circular Upward Arrow Submit Button */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={onOpenWhatsAppModal}
+                        className="p-2 sm:p-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition"
+                        title="Audit via WhatsApp Cloud API"
+                      >
+                        <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
+                      </button>
+
+                      {/* Circular Action Button with Arrow Up (soft periwinkle matching reference) */}
+                      <button
+                        type="button"
+                        onClick={handlePromptSubmit}
+                        disabled={isProcessing}
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#7C88C2] hover:bg-[#8D99D4] text-white flex items-center justify-center transition-all duration-200 shadow-[0_4px_16px_rgba(124,136,194,0.35)] active:scale-95 disabled:opacity-40 shrink-0"
+                        title="Lancer l'analyse du plan"
+                      >
+                        {isProcessing ? (
+                          <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        ) : (
+                          <ArrowUp className="w-5 h-5 text-white stroke-[2.75]" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Suggestions List (identical in style to Meet AI Mode reference image, with crisp readable dark translucent pills) */}
+            <div className="w-full pt-1 space-y-2">
+              <button
+                type="button"
+                onClick={onOpenManualModal}
+                className="group flex items-center gap-3 text-left w-full px-3.5 py-2 rounded-xl bg-[#080A0F]/85 backdrop-blur-md border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] text-xs sm:text-sm text-zinc-300 hover:text-white transition shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-300 transition shrink-0" />
+                <span className="truncate">Auditer les coordonnées géodésiques d&apos;un plan de bornage (UTM 32N / 33N)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="group flex items-center gap-3 text-left w-full px-3.5 py-2 rounded-xl bg-[#080A0F]/85 backdrop-blur-md border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] text-xs sm:text-sm text-zinc-300 hover:text-white transition shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-sky-400/80 group-hover:text-sky-300 transition shrink-0" />
+                <span className="truncate">Extraire les bornes depuis une image ou PDF cadastral via Muse Spark</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPromptText("Vérifier la conformité de superficie légale selon le Décret MINDCAF N° 76-165")}
+                className="group flex items-center gap-3 text-left w-full px-3.5 py-2 rounded-xl bg-[#080A0F]/85 backdrop-blur-md border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] text-xs sm:text-sm text-zinc-300 hover:text-white transition shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400/80 group-hover:text-emerald-300 transition shrink-0" />
+                <span className="truncate">Contrôler la tolérance réglementaire de superficie foncière (Décret MINDCAF 76-165)</span>
+              </button>
             </div>
           </div>
         </div>
@@ -428,7 +476,7 @@ export default function LandingHero({
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-zinc-200">Plan Cadastral Numérisé</span>
               <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-mono text-zinc-400">
-                Llama 3.2 Vision · SAM 3.1
+                Muse Spark · SAM 3.1
               </span>
             </div>
 
@@ -438,7 +486,7 @@ export default function LandingHero({
             <div className="space-y-1">
               <h4 className="text-xs font-semibold text-white">Extraction instantanée du bornage.</h4>
               <p className="text-[11px] text-zinc-400 leading-relaxed font-normal">
-                Meta SAM 3.1 et Llama 3.2 Vision isolent le tableau des coordonnées géodésiques, numérisant les bornes sans saisie manuelle.
+                Meta SAM 3.1 isole le tableau des coordonnées géodésiques, Muse Spark numérise les bornes sans saisie manuelle.
               </p>
             </div>
           </Card>

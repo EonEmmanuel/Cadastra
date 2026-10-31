@@ -79,7 +79,7 @@ export default function AiExtractionReviewModal({
                 <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
                   Extraction Multimodale Vision AI & Revue Humaine
                   <span className="px-2 py-0.5 rounded-full bg-[#00DF8F]/15 text-[#00DF8F] text-[10px] font-mono">
-                    Llama 3.2 Vision · Confiance 97.8%
+                    Muse Spark · pipeline en direct
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-400">

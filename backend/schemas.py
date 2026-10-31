@@ -94,11 +94,13 @@ class TableBoundingBox(BaseModel):
 
 class PlanExtractionResponse(BaseModel):
     extracted_plan: PlanVerificationRequest
-    confidence_score: float
-    sam3_table_roi: TableBoundingBox
-    muse_spark_structured_fields: Dict[str, Any]
-    detected_language: str
-    notes: str
+    # Real values only: fields stay None when the platform does not return them.
+    # No locally-injected confidence score or segmentation box — no simulated data.
+    confidence_score: Optional[float] = None
+    table_roi: Optional[TableBoundingBox] = None
+    spark_structured_fields: Dict[str, Any] = Field(default_factory=dict)
+    detected_language: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class WhatsAppVerificationRequest(BaseModel):

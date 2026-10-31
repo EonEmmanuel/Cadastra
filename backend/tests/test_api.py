@@ -145,14 +145,93 @@ def test_api_get_pdf_report_by_path(client):
     assert response.content[:4] == b"%PDF"
 
 
-def test_api_extract_sam_spark_simulation(client):
+def test_api_extract_requires_api_key(client, monkeypatch):
+    """Sans clé Meta configurée, /api/extract refuse et ne renvoie AUCUNE donnée simulée."""
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "meta_api_key", "")
     response = client.post("/api/extract", data={"profile_hint": "douala_yassa_utm32n.json"})
+    assert response.status_code == 503
+    assert "META_API_KEY" in response.json()["detail"]
+
+
+def test_api_extract_requires_file_with_key(client, monkeypatch):
+    """Clé configurée mais aucun fichier envoyé → 422, pas de plan vide fabriqué."""
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "meta_api_key", "test-key")
+    response = client.post("/api/extract", data={"profile_hint": "douala_yassa_utm32n.json"})
+    assert response.status_code == 422
+    assert "'file'" in response.json()["detail"]
+
+
+def test_api_extract_live_with_key(client, monkeypatch):
+    """Clé + image: l'appel Muse Spark réel est exécuté et sa réponse retournée sans invention."""
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "meta_api_key", "test-key")
+
+    async def fake_call(content_bytes, media_type, filename):
+        assert media_type == "image/jpeg"
+        return {
+            "plan_id": "EXTRACT-01",
+            "locality": "Douala Yassa",
+            "region": "Littoral",
+            "utm_zone": "32N",
+            "stated_area_sqm": 980.0,
+            "beacons": [
+                {"borne_id": "B1", "x": 583420.0, "y": 446100.0},
+                {"borne_id": "B2", "x": 583455.0, "y": 446100.0},
+                {"borne_id": "B3", "x": 583455.0, "y": 446072.0},
+                {"borne_id": "B4", "x": 583420.0, "y": 446072.0},
+            ],
+        }, "chat-completions"
+
+    monkeypatch.setattr(main, "call_spark_extraction", fake_call)
+    response = client.post(
+        "/api/extract",
+        files={"file": ("plan.jpg", b"binary", "image/jpeg")},
+        data={"profile_hint": ""},
+    )
     assert response.status_code == 200
     data = response.json()
-    assert data["confidence_score"] > 0.95
-    assert "sam3_table_roi" in data
-    assert "muse_spark_structured_fields" in data
-    assert data["extracted_plan"]["stated_area_sqm"] == 980.0
+    assert data["extracted_plan"]["plan_id"] == "EXTRACT-01"
+    # No fabricated metrics: confidence and ROI stay None unless grounded/returned
+    assert data["confidence_score"] is None
+    assert data["table_roi"] is None
+    assert data["spark_structured_fields"]["live_api_call"] is True
+    assert data["spark_structured_fields"]["protocol"] == "chat-completions"
+    assert data["spark_structured_fields"]["model_id"] == main.META_EXTRACT_MODEL_ID
+    assert data["spark_structured_fields"]["beacons_extracted_count"] == 4
+
+
+def test_api_extract_pdf_routes_through_files_api(client, monkeypatch):
+    """PDF: jamais d'image_url inline — Files API + Responses API uniquement."""
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "meta_api_key", "test-key")
+
+    async def fake_files_extract(content_bytes, filename, media_type):
+        assert media_type == "application/pdf"
+        assert filename == "plan.pdf"
+        return {
+            "plan_id": "EXTRACT-PDF-01",
+            "locality": "Douala Yassa",
+            "region": "Littoral",
+            "utm_zone": "32N",
+            "stated_area_sqm": 980.0,
+            "beacons": [
+                {"borne_id": "B1", "x": 583420.0, "y": 446100.0},
+                {"borne_id": "B2", "x": 583455.0, "y": 446100.0},
+                {"borne_id": "B3", "x": 583455.0, "y": 446072.0},
+            ],
+        }, "responses-files-api"
+
+    async def must_not_be_called(*args, **kwargs):
+        raise AssertionError("PDF must not use the inline chat-completions image path")
+
+    monkeypatch.setattr(main, "_extract_via_files_api", fake_files_extract)
+    monkeypatch.setattr(main, "_extract_via_chat_completions", must_not_be_called)
+    response = client.post(
+        "/api/extract",
+        files={"file": ("plan.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["extracted_plan"]["plan_id"] == "EXTRACT-PDF-01"
+    assert data["spark_structured_fields"]["protocol"] == "responses-files-api"
 
 
 def test_whatsapp_webhook_verification(client):
@@ -317,3 +396,34 @@ def test_whatsapp_outbound_push_with_cloud_credentials(client, monkeypatch):
     assert sent[1][1]["type"] == "document"
     assert sent[1][1]["document"]["id"] == "fake-media-id"
     assert sent[1][1]["document"]["filename"].endswith(".pdf")
+
+
+def test_whatsapp_unknown_plan_returns_honest_reply(client):
+    """Message sans dossier ni coordonnées: réponse honnête, JAMAIS d'audit d'un profil non lié."""
+    payload = {
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "value": {
+                            "messages": [
+                                {
+                                    "from": "237600000000",
+                                    "type": "text",
+                                    "text": {"body": "Bonjour c'est quoi vos horaires ?"},
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    response = client.post("/api/webhook/whatsapp", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is False
+    assert data["verification_summary"] is None
+    assert data["pdf_report_url"] is None
+    assert "coordonnées" in data["reply_message"]
+    assert "DLA-YAS-2024-001" in data["reply_message"]

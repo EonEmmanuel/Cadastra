@@ -240,17 +240,26 @@ export default function ApiSettingsModal({
               />
             </div>
 
-            {/* Meta Llama Key */}
-            <div className="space-y-1.5 p-4 rounded-2xl bg-white/[0.02]">
-              <label className="text-xs font-medium text-zinc-300">
-                Clé API Meta Llama / Modèle de Vision (Facultatif)
-              </label>
+            {/* Meta Model API Key */}
+            <div className="space-y-1.5 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-white flex items-center gap-2">
+                  <Key className="w-3.5 h-3.5 text-sky-400" />
+                  Clé API Meta Model API (`MODEL_API_KEY`)
+                </label>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  Crédits Hackathon $150
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Connecte directement vos plans à <strong>Meta Muse Spark 1.3</strong> et <strong>SAM 3.1</strong> sur <code className="text-zinc-300">https://api.meta.ai/v1</code> pour extraire les bornes depuis vos images en direct.
+              </p>
               <input
                 type="password"
                 value={metaLlamaKey}
                 onChange={(e) => setMetaLlamaKey(e.target.value)}
-                placeholder="gsk_... / Modal Key"
-                className="w-full bg-white/[0.03] ring-1 ring-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:ring-[#00DF8F]/50 transition"
+                placeholder="Entrez votre clé API Meta Model API (api.meta.ai/v1)..."
+                className="w-full bg-white/[0.03] ring-1 ring-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:ring-sky-400/50 transition"
               />
             </div>
 

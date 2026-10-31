@@ -15,9 +15,10 @@ from typing import Optional, List, Dict, Any
 
 from dotenv import load_dotenv
 import httpx
+from pydantic import ValidationError
 
 # Load backend/.env (git-ignored) so a plain "uvicorn backend.main:app" run
-# picks up META_LLAMA_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID and
+# picks up META_API_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID and
 # WHATSAPP_VERIFY_TOKEN without extra configuration.
 load_dotenv()
 from fastapi import FastAPI, HTTPException, Query, Response, UploadFile, File, Form
@@ -64,15 +65,96 @@ RUNTIME_CONFIG = {
     "whatsapp_token": os.getenv("WHATSAPP_TOKEN", ""),
     "phone_number_id": os.getenv("PHONE_NUMBER_ID", ""),
     "whatsapp_verify_token": os.getenv("WHATSAPP_VERIFY_TOKEN", "cadastra_cameroon_secret_token_2026"),
-    "meta_llama_key": os.getenv("META_LLAMA_KEY", ""),
+    # Hackathon platform key granting SAM 3.1 + Spark access (Llama is NOT part
+    # of this key; open-weight models like Glimmer are not callable with it).
+    "meta_api_key": os.getenv(
+        "META_API_KEY",
+        os.getenv("MODEL_API_KEY", os.getenv("META_MODEL_API_KEY", os.getenv("META_LLAMA_KEY", ""))),
+    ),
     "webhook_url": "http://localhost:8000/api/webhook/whatsapp",
+}
+
+# Meta Model API (verified against https://dev.meta.ai/docs/, Oct 2026):
+# - Base URL https://api.meta.ai/v1, Bearer auth.
+# - Muse Spark 1.3 reads images (Chat Completions `image_url` data URL) and
+#   grounds objects on a normalized 0-1000 grid.
+# - Contributor mode variants: muse-spark-1.3-contributor / muse-spark-1.2-
+#   contributor run the SAME models at ~12-21x cheaper token prices in exchange
+#   for permission to train on submitted content (limits: 150 RPM / 3M TPM).
+#   Choose via META_EXTRACT_MODEL_ID — Standard mode keeps content out of training.
+# - SAM 3.1 (model sam-3.1) segments via the Responses API — same key, available
+#   for pixel-accurate ROI if needed later.
+# - Muse Glimmer / Muse Spark Open are open weights, self-hosted only: NOT
+#   callable through this key. Llama is not part of this API's model list.
+META_API_BASE_URL = "https://api.meta.ai"
+META_EXTRACT_MODEL_ID = os.getenv("META_EXTRACT_MODEL_ID", "muse-spark-1.3")
+META_VISION_MODEL_ID = os.getenv("META_VISION_MODEL_ID", "sam-3.1")
+
+# Inline image_url is limited to image MIME types; PDFs go through the Files API.
+INLINE_IMAGE_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"}
+
+CADASTRA_EXTRACTION_SYSTEM_PROMPT = (
+    "Tu es l'agent d'extraction cadastrale pour le Cameroun (MINDCAF), basé sur Meta Model API (Muse Spark). "
+    "Analyse l'image du plan cadastral fournie et extrait le tableau des coordonnées géodésiques. "
+    "Repnds UNIQUEMENT un objet JSON conforme au schéma: plan_id, locality, region, utm_zone (32N ou 33N), "
+    "stated_area_sqm (superficie déclarée en m²), beacons (liste ordonnée {borne_id, x Easting, y Northing, z optionnel}) "
+    "et coordinates_table_box: cadre englobant du tableau de coordonnées sur la grille normalisée 0-1000 (0,0 en haut à gauche)."
+)
+CADASTRA_EXTRACTION_USER_PROMPT = (
+    "Extrais les bornes géodésiques (identifiants, X, Y) et la superficie déclarée de ce plan cadastral, "
+    "puis localise le tableau de coordonnées. Retourne uniquement le JSON du schéma."
+)
+
+# Structured output (json_schema) — the platform constrains decoding to this schema.
+PLAN_EXTRACTION_JSON_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "cadastral_plan",
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "plan_id": {"type": "string"},
+                "locality": {"type": "string"},
+                "region": {"type": "string"},
+                "utm_zone": {"type": "string", "enum": ["32N", "33N"]},
+                "stated_area_sqm": {"type": "number"},
+                "coordinates_table_box": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "x_min": {"type": "integer"},
+                        "y_min": {"type": "integer"},
+                        "x_max": {"type": "integer"},
+                        "y_max": {"type": "integer"},
+                    },
+                    "required": ["x_min", "y_min", "x_max", "y_max"],
+                },
+                "beacons": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "borne_id": {"type": "string"},
+                            "x": {"type": "number"},
+                            "y": {"type": "number"},
+                            "z": {"type": "number"},
+                        },
+                        "required": ["borne_id", "x", "y"],
+                    },
+                },
+            },
+            "required": ["plan_id", "locality", "region", "utm_zone", "stated_area_sqm", "beacons"],
+        },
+    },
 }
 
 
 # --- WhatsApp Cloud API outbound push (Graph API) ---
 
 GRAPH_API_BASE = "https://graph.facebook.com"
-GRAPH_API_VERSION = "v23.0"
+GRAPH_API_VERSION = "v26.0"
 
 
 def upload_whatsapp_media(pdf_bytes: bytes, filename: str) -> Optional[str]:
@@ -142,14 +224,16 @@ def get_runtime_config():
         "whatsapp_token_configured": bool(RUNTIME_CONFIG["whatsapp_token"]),
         "phone_number_id": RUNTIME_CONFIG["phone_number_id"],
         "whatsapp_verify_token": RUNTIME_CONFIG["whatsapp_verify_token"],
-        "meta_llama_key_configured": bool(RUNTIME_CONFIG["meta_llama_key"]),
+        "meta_api_key_configured": bool(RUNTIME_CONFIG["meta_api_key"]),
+        # Legacy alias kept for clients still reading the old field name.
+        "meta_llama_key_configured": bool(RUNTIME_CONFIG["meta_api_key"]),
         "webhook_url": RUNTIME_CONFIG["webhook_url"],
     }
 
 
 @app.post("/api/config")
 def update_runtime_config(payload: Dict[str, str]):
-    """Update Meta WhatsApp Cloud API credentials and Llama API keys dynamically."""
+    """Update Meta WhatsApp Cloud API credentials and Meta platform (SAM 3.1 / Spark) API keys."""
     if "whatsapp_token" in payload:
         RUNTIME_CONFIG["whatsapp_token"] = payload["whatsapp_token"]
     if "phone_number_id" in payload:
@@ -158,8 +242,10 @@ def update_runtime_config(payload: Dict[str, str]):
         RUNTIME_CONFIG["whatsapp_verify_token"] = payload["whatsapp_verify_token"]
         global WHATSAPP_VERIFY_TOKEN
         WHATSAPP_VERIFY_TOKEN = payload["whatsapp_verify_token"]
-    if "meta_llama_key" in payload:
-        RUNTIME_CONFIG["meta_llama_key"] = payload["meta_llama_key"]
+    for key_name in ("meta_api_key", "meta_llama_key", "model_api_key"):
+        if key_name in payload:
+            RUNTIME_CONFIG["meta_api_key"] = payload[key_name]
+            break
     if "webhook_url" in payload:
         RUNTIME_CONFIG["webhook_url"] = payload["webhook_url"]
 
@@ -263,13 +349,7 @@ def get_pdf_report_by_query(plan_id: str = Query("douala_yassa_utm32n.json", des
     """Download official PDF cadastral report via GET query parameter."""
     plan_req = _find_plan_by_id(plan_id)
     if not plan_req:
-        # Fallback to default Douala Yassa profile if not found
-        default_file = TEST_DATA_DIR / "douala_yassa_utm32n.json"
-        if default_file.exists():
-            with open(default_file, "r", encoding="utf-8") as f:
-                plan_req = PlanVerificationRequest(**json.load(f))
-        else:
-            raise HTTPException(status_code=404, detail=f"Dossier cadastral {plan_id} introuvable.")
+        raise HTTPException(status_code=404, detail=f"Dossier cadastral {plan_id} introuvable.")
 
     return generate_pdf_report(plan_req)
 
@@ -318,44 +398,199 @@ def get_preset_profile(filename: str):
         return json.load(f)
 
 
+def _meta_json_headers() -> Dict[str, str]:
+    return {
+        "Authorization": f"Bearer {RUNTIME_CONFIG.get('meta_api_key', '')}",
+        "Content-Type": "application/json",
+    }
+
+
+async def _extract_via_chat_completions(content_bytes: bytes, media_type: str) -> tuple[Dict[str, Any], str]:
+    """Image path: inline base64 data URL through POST /v1/chat/completions.
+
+    Verified request shape (dev.meta.ai/docs/image-understanding): Muse Spark
+    reads the image and json_schema structured output constrains the response.
+    """
+    b64_content = base64.b64encode(content_bytes).decode("utf-8")
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(
+            f"{META_API_BASE_URL}/v1/chat/completions",
+            headers=_meta_json_headers(),
+            json={
+                "model": META_EXTRACT_MODEL_ID,
+                "messages": [
+                    {"role": "system", "content": CADASTRA_EXTRACTION_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": CADASTRA_EXTRACTION_USER_PROMPT},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{media_type};base64,{b64_content}"},
+                            },
+                        ],
+                    },
+                ],
+                "response_format": PLAN_EXTRACTION_JSON_FORMAT,
+            },
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erreur Meta Model API {response.status_code}: {response.text[:300]}",
+        )
+    raw_text = response.json()["choices"][0]["message"]["content"]
+    return json.loads(raw_text), "chat-completions"
+
+
+async def _extract_via_files_api(content_bytes: bytes, filename: str, media_type: str) -> tuple[Dict[str, Any], str]:
+    """PDF/other path: POST /v1/files then POST /v1/responses with input_image file_id.
+
+    Inline image_url accepts image MIME types only, so PDFs are uploaded through
+    the Files API (purpose="user_data") and referenced by id on the Responses API.
+    """
+    async with httpx.AsyncClient(timeout=90.0) as client:
+        upload = await client.post(
+            f"{META_API_BASE_URL}/v1/files",
+            headers={"Authorization": f"Bearer {RUNTIME_CONFIG.get('meta_api_key', '')}"},
+            files={"file": (filename, io.BytesIO(content_bytes), media_type or "application/octet-stream")},
+            data={"purpose": "user_data"},
+        )
+        if upload.status_code != 200:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Erreur Meta Files API {upload.status_code}: {upload.text[:300]}",
+            )
+        file_id = upload.json().get("id")
+
+        response = await client.post(
+            f"{META_API_BASE_URL}/v1/responses",
+            headers=_meta_json_headers(),
+            json={
+                "model": META_EXTRACT_MODEL_ID,
+                "input": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text", "text": CADASTRA_EXTRACTION_USER_PROMPT},
+                            {"type": "input_image", "file_id": file_id},
+                        ],
+                    }
+                ],
+                "text": {"format": PLAN_EXTRACTION_JSON_FORMAT},
+            },
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erreur Meta Model API {response.status_code}: {response.text[:300]}",
+        )
+
+    output_text = None
+    for output_item in response.json().get("output", []):
+        if output_item.get("type") == "message":
+            for content_block in output_item.get("content", []):
+                if content_block.get("type") == "output_text" and content_block.get("text"):
+                    output_text = content_block["text"]
+                    break
+        if output_text:
+            break
+    if output_text is None:
+        raise HTTPException(status_code=502, detail="Réponse Meta sans texte exploitable.")
+    return json.loads(output_text), "responses-files-api"
+
+
+async def call_spark_extraction(content_bytes: bytes, media_type: str, filename: str = "plan.jpg") -> tuple[Dict[str, Any], str]:
+    """Dispatch the real Muse Spark extraction call by input media type.
+
+    Returns (parsed_json, protocol_used). Raises on any platform error or
+    unparseable response — no fallback data is ever returned.
+    """
+    if media_type in INLINE_IMAGE_MIME_TYPES:
+        return await _extract_via_chat_completions(content_bytes, media_type)
+    return await _extract_via_files_api(content_bytes, filename, media_type)
+
+
 @app.post("/api/extract", response_model=PlanExtractionResponse)
 async def extract_plan_from_document(
     file: Optional[UploadFile] = File(None),
     profile_hint: Optional[str] = Form(None),
 ):
-    """Simulate Meta SAM 3.1 Table Segmentation + Meta Muse Spark Coordinate Extraction.
+    """Extract structured beacon data via the real Meta Model API (Muse Spark).
 
-    SAM 3.1 isolates the beacon table ROI (bounding box) on the paper plan scan.
-    Muse Spark reasons over the unstructured tabular text and produces verified structured JSON.
+    Muse Spark reads the plan image (or PDF page-images via the Files API),
+    extracts the beacon table AND grounds the coordinate-table box on the
+    normalized 0-1000 grid. SAM 3.1 remains available on the same key for
+    pixel-accurate segmentation. NO simulation: without MODEL_API_KEY the
+    endpoint returns 503 instead of placeholder data.
     """
-    # If a profile hint was given or default to Douala Yassa
-    target_profile = profile_hint or "douala_yassa_utm32n.json"
-    file_path = TEST_DATA_DIR / target_profile
+    if not RUNTIME_CONFIG.get("meta_api_key"):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Clé Meta Model API non configurée. Ajoutez META_API_KEY dans backend/.env "
+                "(plateforme hackathon : Muse Spark, SAM 3.1). Aucune donnée de simulation "
+                "n'est générée par conception — saisissez les coordonnées manuellement."
+            ),
+        )
 
-    if not file_path.exists():
-        file_path = TEST_DATA_DIR / "douala_yassa_utm32n.json"
+    if not file:
+        raise HTTPException(
+            status_code=422,
+            detail="Envoie l'image ou le PDF du plan à analyser (champ multipart 'file').",
+        )
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        content_bytes = await file.read()
+        parsed, protocol_used = await call_spark_extraction(
+            content_bytes,
+            file.content_type or "application/octet-stream",
+            file.filename or "plan.jpg",
+        )
+        extracted_request = PlanVerificationRequest(**parsed)
+    except HTTPException:
+        raise
+    except (json.JSONDecodeError, ValidationError, KeyError, ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Réponse du modèle non exploitable: {exc}",
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Échec de l'appel Meta: {exc}")
 
-    extracted_request = PlanVerificationRequest(**data)
+    # Real table ROI from Muse Spark perception grounding (0-1000 grid -> 0-1).
+    table_roi: Optional[TableBoundingBox] = None
+    grounded_box = parsed.get("coordinates_table_box") if isinstance(parsed, dict) else None
+    if grounded_box:
+        try:
+            table_roi = TableBoundingBox(
+                ymin=grounded_box["y_min"] / 1000.0,
+                xmin=grounded_box["x_min"] / 1000.0,
+                ymax=grounded_box["y_max"] / 1000.0,
+                xmax=grounded_box["x_max"] / 1000.0,
+            )
+        except (KeyError, TypeError):
+            table_roi = None  # grounding omitted / malformed: stays None, never faked
 
-    # SAM 3.1 detected table bounding box (normalized coordinates)
-    sam3_roi = TableBoundingBox(ymin=0.62, xmin=0.08, ymax=0.91, xmax=0.92)
-
+    # Only real facts about the call — no invented metrics.
+    structured_fields = {
+        "provider": "Meta Model API",
+        "model_id": META_EXTRACT_MODEL_ID,
+        "protocol": protocol_used,
+        "beacons_extracted_count": len(extracted_request.beacons),
+        "viewing_projection": f"UTM {extracted_request.utm_zone.value}",
+        "vision_model_id": META_VISION_MODEL_ID,
+        "grounding_grid": "0-1000 (Muse Spark perception grounding)",
+        "live_api_call": True,
+    }
     return PlanExtractionResponse(
         extracted_plan=extracted_request,
-        confidence_score=0.978,
-        sam3_table_roi=sam3_roi,
-        muse_spark_structured_fields={
-            "detected_table_type": "Tableau des Coordonnées et Distances Périmétriques",
-            "detected_projection": f"UTM {extracted_request.utm_zone.value}",
-            "beacons_extracted_count": len(extracted_request.beacons),
-            "surveyor_signature_detected": True,
-            "cadastral_stamp_detected": True,
-        },
-        detected_language="fr-FR",
-        notes="Tableau segmenté avec succès par Meta SAM 3.1. Extraction structurée réalisée par Meta Muse Spark 1.3.",
+        table_roi=table_roi,
+        spark_structured_fields=structured_fields,
+        notes="Extraction en direct via Meta Model API (Muse Spark).",
     )
 
 
@@ -447,22 +682,21 @@ def handle_whatsapp_message(payload: Dict[str, Any]):
                 plan_req = found
                 break
 
-    # 3. Match by semantic keywords
+    # 3. No recognizable plan and no coordinates: answer honestly instead of
+    # auditing an unrelated sample profile (no fabricated verdicts).
     if not plan_req:
-        selected_file = "douala_yassa_utm32n.json"
-        if "fraud" in lowered or "fictive" in lowered:
-            selected_file = "douala_yassa_fraud_superficie.json"
-        elif "odza" in lowered or "yaounde" in lowered or "yaoundé" in lowered or "mfoundi" in lowered:
-            selected_file = "yaounde_odza_utm32n.json"
-        elif "kribi" in lowered or "mpalla" in lowered or "ocean" in lowered:
-            selected_file = "kribi_ocean_overlap_utm32n.json"
-        elif "garoua" in lowered or "nord" in lowered or "maroua" in lowered:
-            selected_file = "garoua_utm33n.json"
-
-        file_path = TEST_DATA_DIR / selected_file
-        with open(file_path, "r", encoding="utf-8") as f:
-            plan_data = json.load(f)
-        plan_req = PlanVerificationRequest(**plan_data)
+        return WhatsAppVerificationResponse(
+            success=False,
+            reply_message=(
+                "⚠️ Je n'ai pas trouvé de dossier ou de coordonnées dans votre message.\n\n"
+                "Envoyez les bornes au format :\n"
+                "B1: 583420, 446100\nB2: 583455, 446100\nB3: 583455, 446072\nB4: 583420, 446072\n"
+                "Superficie déclarée : 980 m2\n\n"
+                "…ou l'identifiant du dossier à vérifier (ex: DLA-YAS-2024-001)."
+            ),
+            pdf_report_url=None,
+            verification_summary=None,
+        )
 
     verification = engine.verify_plan(plan_req)
 
