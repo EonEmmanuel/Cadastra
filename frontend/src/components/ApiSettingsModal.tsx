@@ -32,6 +32,26 @@ export default function ApiSettingsModal({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [testStatus, setTestStatus] = useState<string | null>(null);
+  // Real server-side key status from /api/config (nothing is stored in/required by the browser).
+  const [serverStatus, setServerStatus] = useState<{
+    metaApiKey: boolean;
+    whatsappToken: boolean;
+  } | null>(null);
+
+  const refreshConfig = () => {
+    fetch(`${apiBaseUrl}/api/config`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.webhook_url) setWebhookUrl(data.webhook_url);
+        if (data.phone_number_id) setPhoneNumberId((prev) => prev || data.phone_number_id);
+        if (data.whatsapp_verify_token) setVerifyToken((prev) => prev || data.whatsapp_verify_token);
+        setServerStatus({
+          metaApiKey: !!data.meta_api_key_configured,
+          whatsappToken: !!data.whatsapp_token_configured,
+        });
+      })
+      .catch(() => {});
+  };
 
   // Load saved config on mount
   useEffect(() => {
@@ -48,15 +68,8 @@ export default function ApiSettingsModal({
     if (savedVerifyToken) setVerifyToken(savedVerifyToken);
     if (savedLlamaKey) setMetaLlamaKey(savedLlamaKey);
 
-    // Fetch remote config status from backend
-    fetch(`${apiBaseUrl}/api/config`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.webhook_url) setWebhookUrl(data.webhook_url);
-        if (data.phone_number_id && !savedPhoneId) setPhoneNumberId(data.phone_number_id);
-        if (data.whatsapp_verify_token && !savedVerifyToken) setVerifyToken(data.whatsapp_verify_token);
-      })
-      .catch(() => {});
+    refreshConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, apiBaseUrl]);
 
   if (!isOpen) return null;
@@ -88,6 +101,7 @@ export default function ApiSettingsModal({
       if (res.ok) {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2500);
+        refreshConfig();
       }
     } catch (e) {
       console.warn("Could not sync with backend config endpoint", e);
@@ -215,7 +229,17 @@ export default function ApiSettingsModal({
                 <label className="font-medium text-zinc-300">
                   Jeton d&apos;Accès WhatsApp Cloud API (`WHATSAPP_TOKEN`)
                 </label>
-                <span className="text-[10px] font-mono text-zinc-500">Bearer Token</span>
+                <span className="text-[10px] font-mono">
+                  {serverStatus?.whatsappToken ? (
+                    <span className="px-2 py-0.5 rounded-full bg-[#00DF8F]/10 text-[#00DF8F] border border-[#00DF8F]/30">
+                      Serveur : configurée
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.1]">
+                      Serveur : simulation locale
+                    </span>
+                  )}
+                </span>
               </div>
               <input
                 type="password"
@@ -245,11 +269,27 @@ export default function ApiSettingsModal({
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-white flex items-center gap-2">
                   <Key className="w-3.5 h-3.5 text-sky-400" />
-                  Clé API Meta Model API (`MODEL_API_KEY`)
+                  Clé API Meta Model API (`META_API_KEY`)
                 </label>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
                   Crédits Hackathon $150
                 </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <span className="text-zinc-500">État serveur :</span>
+                {serverStatus ? (
+                  serverStatus.metaApiKey ? (
+                    <span className="px-2 py-0.5 rounded-full bg-[#00DF8F]/10 text-[#00DF8F] border border-[#00DF8F]/30">
+                      Clé chargée côté serveur
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                      Absente du serveur — extraction indisponible
+                    </span>
+                  )
+                ) : (
+                  <span className="text-zinc-500">vérification…</span>
+                )}
               </div>
               <p className="text-[11px] text-zinc-400 leading-relaxed">
                 Connecte directement vos plans à <strong>Meta Muse Spark 1.3</strong> sur <code className="text-zinc-300">https://api.meta.ai/v1</code> pour extraire les bornes depuis vos images en direct.
@@ -258,9 +298,12 @@ export default function ApiSettingsModal({
                 type="password"
                 value={metaLlamaKey}
                 onChange={(e) => setMetaLlamaKey(e.target.value)}
-                placeholder="Entrez votre clé API Meta Model API (api.meta.ai/v1)..."
+                placeholder="Override optionnel — sinon la clé vit dans backend/.env côté serveur"
                 className="w-full bg-white/[0.03] ring-1 ring-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:ring-sky-400/50 transition"
               />
+              <p className="text-[10px] text-zinc-500">
+                Ce champ est optionnel : en production la clé est lue dans <code>backend/.env</code> ou les variables d'environnement du serveur et n'est jamais stockée dans le navigateur.
+              </p>
             </div>
 
             {/* Test Status info */}

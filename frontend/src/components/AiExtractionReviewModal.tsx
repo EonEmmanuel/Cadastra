@@ -123,15 +123,16 @@ export default function AiExtractionReviewModal({
                     className="absolute inset-0 w-full h-full object-contain"
                   />
 
-                  {/* Real grounding box returned by Muse Spark */}
+                  {/* Real grounding box returned by Muse Spark.
+                      table_roi values are normalized 0-1 (from the 0-1000 grid). */}
                   {previewData.tableRoi && (
                     <div
                       className="absolute border-2 border-[#00DF8F] bg-[#00DF8F]/5 pointer-events-none"
                       style={{
-                        left: `${previewData.tableRoi.xmin / 10}%`,
-                        top: `${previewData.tableRoi.ymin / 10}%`,
-                        width: `${Math.max(0, (previewData.tableRoi.xmax - previewData.tableRoi.xmin) / 10)}%`,
-                        height: `${Math.max(0, (previewData.tableRoi.ymax - previewData.tableRoi.ymin) / 10)}%`,
+                        left: `${previewData.tableRoi.xmin * 100}%`,
+                        top: `${previewData.tableRoi.ymin * 100}%`,
+                        width: `${Math.max(0, (previewData.tableRoi.xmax - previewData.tableRoi.xmin) * 100)}%`,
+                        height: `${Math.max(0, (previewData.tableRoi.ymax - previewData.tableRoi.ymin) * 100)}%`,
                       }}
                     >
                       <span className="absolute -top-5 left-0 px-1.5 py-0.5 rounded bg-[#00DF8F] text-black text-[9px] font-mono font-bold whitespace-nowrap">
@@ -158,13 +159,36 @@ export default function AiExtractionReviewModal({
                 </div>
               )}
 
+              {/* Real Muse Spark zoom recheck crop: the exact lossless PNG the
+                  beacons were re-read from at full resolution */}
+              {previewData?.cropUrl && (
+                <div className="space-y-1">
+                  <div className="relative rounded-2xl overflow-hidden bg-[#0D1017] ring-1 ring-white/[0.08] min-h-[220px] flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={previewData.cropUrl}
+                      alt="Recadrage du tableau des bornes relu par Muse Spark"
+                      className="max-h-[260px] w-auto max-w-full object-contain"
+                    />
+                  </div>
+                  <p className="text-[10px] font-mono text-zinc-500 flex items-center gap-1.5">
+                    <span className="text-[#00DF8F]">Relecture zoom</span>
+                    <span>
+                      {previewData.zoomRecheck === "applied"
+                        ? "appliquée — chaque chiffre relu sur ce recadrage"
+                        : previewData.zoomRecheck ?? ""}
+                    </span>
+                  </p>
+                </div>
+              )}
+
               {/* Real provenance facts only — nothing simulated */}
               <div className="p-2.5 rounded-xl bg-white/[0.03] text-[10px] font-mono text-zinc-400 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[#00DF8F]">Grounding Muse Spark</span>
                   <span className="text-zinc-500">
                     {previewData?.tableRoi
-                      ? `ROI [x ${Math.round(previewData.tableRoi.xmin)}–${Math.round(previewData.tableRoi.xmax)} · y ${Math.round(previewData.tableRoi.ymin)}–${Math.round(previewData.tableRoi.ymax)}] / 1000`
+                      ? `ROI [x ${Math.round(previewData.tableRoi.xmin * 1000)}–${Math.round(previewData.tableRoi.xmax * 1000)} · y ${Math.round(previewData.tableRoi.ymin * 1000)}–${Math.round(previewData.tableRoi.ymax * 1000)}] / 1000`
                       : "boîte non renvoyée par le modèle"}
                   </span>
                 </div>

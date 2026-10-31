@@ -59,6 +59,14 @@ body {
   z-index: 10;
 }
 
+/* Dark detail map ("Carte" mode): standard OSM tiles inverted into a dark
+   theme while staying fully readable — street-level detail down to z19.
+   `.cartedark` is applied to the TileLayer wrapper itself, whose children
+   are the tile <img> elements. */
+.cartedark .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.65);
+}
+
 /* Leaflet Dark Popups */
 .leaflet-popup-content-wrapper {
   background: #090B10 !important;

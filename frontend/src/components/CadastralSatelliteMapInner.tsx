@@ -260,12 +260,16 @@ export default function CadastralSatelliteMapInner({
             />
           )}
 
-          {/* Layer 2: Carte Noire (CartoDB Dark Matter) */}
+          {/* Layer 2: Carte Noire (OSM tiles inverted for a dark, detailed
+              street-level basemap, zoomable to z19 — Replaces Esri Dark Gray
+              Canvas, which caps at z16 and loses detail at parcel scale, and
+              CartoDB Dark Matter, which now requires an API key) */}
           {tileMode === "carte" && (
             <TileLayer
-              attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
               maxZoom={19}
+              className="cartedark"
             />
           )}
 

@@ -15,6 +15,7 @@ from typing import Optional, List, Dict, Any
 
 from dotenv import load_dotenv
 import httpx
+from PIL import Image, ImageOps
 from pydantic import ValidationError
 
 # Load backend/.env (git-ignored) so a plain "uvicorn backend.main:app" run
@@ -105,6 +106,22 @@ CADASTRA_EXTRACTION_USER_PROMPT = (
     "puis localise le tableau de coordonnées. Retourne uniquement le JSON du schéma."
 )
 
+# Zoom recheck pass: second Spark call on the grounded table crop.
+CADASTRA_ZOOM_RECHECK_SYSTEM_PROMPT = (
+    "Tu es un agent de relecture cadastrale pour le Cameroun (MINDCAF), basé sur Meta Model API (Muse Spark). "
+    "On t'envoie le recadrage haute résolution du tableau de coordonnées d'un plan de bornage déjà localisé par grounding. "
+    "Relis le tableau en entier, colonne par colonne, ligne par ligne, chaque chiffre isolément "
+    "(attention aux confusions 1/7, 5/6, 0/O et aux décimales tronquées). "
+    "N'arrondis JAMAIS une valeur: reproduis toutes les décimales imprimées, y compris les .00. "
+    "Si une valeur est partiellement illisible, garde la lecture la plus probable sans jamais la tronquer. "
+    "Réponds UNIQUEMENT un objet JSON conforme au schéma: beacons = liste ordonnée "
+    "{borne_id, x (Easting), y (Northing), z optionnel}."
+)
+CADASTRA_ZOOM_RECHECK_USER_PROMPT = (
+    "Relis précisément ce tableau de bornage recadré et retourne chaque borne avec ses valeurs exactes, "
+    "décimales telles qu'imprimées. Retourne uniquement le JSON du schéma."
+)
+
 # Structured output (json_schema) — the platform constrains decoding to this schema.
 PLAN_EXTRACTION_JSON_FORMAT = {
     "type": "json_schema",
@@ -146,6 +163,38 @@ PLAN_EXTRACTION_JSON_FORMAT = {
                 },
             },
             "required": ["plan_id", "locality", "region", "utm_zone", "stated_area_sqm", "beacons"],
+        },
+    },
+}
+
+# Zoom recheck contract: beacons only. The crop shows the coordinates table,
+# never the full plan header, so no plan metadata is requested — nothing gets
+# invented from a cropped view.
+PLAN_ZOOM_RECHECK_JSON_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "beacon_zoom_recheck",
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "beacons": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "borne_id": {"type": "string"},
+                            "x": {"type": "number"},
+                            "y": {"type": "number"},
+                            "z": {"type": "number"},
+                        },
+                        "required": ["borne_id", "x", "y"],
+                    },
+                    "minItems": 3,
+                },
+            },
+            "required": ["beacons"],
         },
     },
 }
@@ -445,6 +494,104 @@ async def _extract_via_chat_completions(content_bytes: bytes, media_type: str) -
     return json.loads(raw_text), "chat-completions"
 
 
+async def _recheck_beacons_via_chat_completions(crop_bytes: bytes) -> Dict[str, Any]:
+    """Second-pass digit re-read on the grounded table crop (visual zoom).
+
+    Same verified Chat Completions request shape as the primary extraction, but
+    the payload is a focused, lossless PNG of just the coordinates table and the
+    schema covers beacons only (no plan metadata to invent from a cropped view).
+    Raises on platform errors or unparseable text — the caller degrades
+    gracefully to the first-pass reading.
+    """
+    b64_content = base64.b64encode(crop_bytes).decode("utf-8")
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(
+            f"{META_API_BASE_URL}/v1/chat/completions",
+            headers=_meta_json_headers(),
+            json={
+                "model": META_EXTRACT_MODEL_ID,
+                "messages": [
+                    {"role": "system", "content": CADASTRA_ZOOM_RECHECK_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": CADASTRA_ZOOM_RECHECK_USER_PROMPT},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{b64_content}"},
+                            },
+                        ],
+                    },
+                ],
+                "response_format": PLAN_ZOOM_RECHECK_JSON_FORMAT,
+            },
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erreur Meta Model API {response.status_code}: {response.text[:300]}",
+        )
+    raw_text = response.json()["choices"][0]["message"]["content"]
+    return json.loads(raw_text)
+
+
+def _crop_table_region(content_bytes: bytes, roi: TableBoundingBox) -> bytes:
+    """Crop the grounded coordinates-table region from the exact uploaded frame.
+
+    `roi` comes normalized 0-1 (from the 0-1000 grounding grid). Grounding boxes
+    tend to sit slightly inside the printed table, so the crop keeps a 3% margin
+    on each side — cutting decimal columns off was a real failure mode. Small
+    crops are upscaled 2x (LANCZOS) so Spark's vision tiles process more
+    effective pixels per digit. Saved as lossless PNG.
+    """
+    try:
+        img = Image.open(io.BytesIO(content_bytes))
+        img = ImageOps.exif_transpose(img)
+    except Exception as exc:
+        raise RuntimeError(f"Image illisible pour le recadrage zoom: {exc}")
+    width, height = img.size
+    pad_x = max(2, int(width * 0.03))
+    pad_y = max(2, int(height * 0.03))
+    left = max(0, int(roi.xmin * width) - pad_x)
+    top = max(0, int(roi.ymin * height) - pad_y)
+    right = min(width, int(roi.xmax * width) + pad_x)
+    bottom = min(height, int(roi.ymax * height) + pad_y)
+    if right - left < 40 or bottom - top < 40:
+        raise RuntimeError("Boîte de grounding trop petite pour recadrer.")
+    crop = img.crop((left, top, right, bottom)).convert("RGB")
+    if max(crop.size) < 1400:
+        crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
+    out = io.BytesIO()
+    crop.save(out, format="PNG")
+    return out.getvalue()
+
+
+def _normalize_image_bytes(content_bytes: bytes, media_type: str) -> tuple[bytes, str]:
+    """EXIF-orient inline photos so the pixel frame matches what Spark grounds on.
+
+    Vision calls receive the raw bytes while browsers display the EXIF-rotated
+    variant — without this step the grounding box would not line up with the UI
+    preview. Frames otherwise stay untouched: no resizing, no re-compression
+    (a large scan keeps its native resolution).
+    """
+    try:
+        img = Image.open(io.BytesIO(content_bytes))
+        orientation = img.getexif().get(0x0112, 1)
+    except Exception:
+        return content_bytes, media_type  # unreadable: send raw bytes as-is
+    if orientation in (2, 3, 4, 5, 6, 7, 8):
+        img = ImageOps.exif_transpose(img)
+        out = io.BytesIO()
+        if media_type == "image/png":
+            img.save(out, format="PNG")
+            return out.getvalue(), "image/png"
+        img.convert("RGB").save(out, format="JPEG", quality=92)
+        return out.getvalue(), "image/jpeg"
+    return content_bytes, media_type
+
+
 async def _extract_via_files_api(content_bytes: bytes, filename: str, media_type: str) -> tuple[Dict[str, Any], str]:
     """PDF/other path: POST /v1/files then POST /v1/responses with input_image file_id.
 
@@ -545,12 +692,18 @@ async def extract_plan_from_document(
 
     try:
         content_bytes = await file.read()
+        media_type = file.content_type or "application/octet-stream"
+        # EXIF-orient inline photos first: the grounding box is expressed on the
+        # exact pixel frame we upload, while browsers display the rotated
+        # variant. Same frame = the zoom recheck crop lines up with what the
+        # model actually saw.
+        if media_type in INLINE_IMAGE_MIME_TYPES:
+            content_bytes, media_type = _normalize_image_bytes(content_bytes, media_type)
         parsed, protocol_used = await call_spark_extraction(
             content_bytes,
-            file.content_type or "application/octet-stream",
+            media_type,
             file.filename or "plan.jpg",
         )
-        extracted_request = PlanVerificationRequest(**parsed)
     except HTTPException:
         raise
     except (json.JSONDecodeError, ValidationError, KeyError, ValueError, TypeError) as exc:
@@ -575,6 +728,45 @@ async def extract_plan_from_document(
         except (KeyError, TypeError):
             table_roi = None  # grounding omitted / malformed: stays None, never faked
 
+    # Visual-zoom recheck: re-read the grounded coordinates table on a lossless
+    # crop of the exact frame Muse Spark grounded — native resolution over the
+    # region that matters most. Cases caught by a human reviewer on dense digit
+    # columns (5/6, 1/7, truncated decimals) drop sharply. Applied only when the
+    # model returned a grounding box; any failure degrades gracefully to the
+    # first-pass reading and is reported honestly.
+    zoom_status = "skipped"
+    table_crop_data_url: Optional[str] = None
+    if protocol_used == "chat-completions" and table_roi is not None:
+        try:
+            crop_bytes = _crop_table_region(content_bytes, table_roi)
+            zoom_result = await _recheck_beacons_via_chat_completions(crop_bytes)
+            zoom_beacons = zoom_result.get("beacons") if isinstance(zoom_result, dict) else None
+            # Only adopt the zoom reading when it found the same number of rows —
+            # a mismatched count means the crop or the reading lost structure,
+            # and silently re-binding rows would corrupt the mapping.
+            if (
+                isinstance(zoom_beacons, list)
+                and isinstance(parsed.get("beacons"), list)
+                and len(zoom_beacons) == len(parsed["beacons"])
+            ):
+                parsed["beacons"] = zoom_beacons
+                table_crop_data_url = (
+                    "data:image/png;base64," + base64.b64encode(crop_bytes).decode("utf-8")
+                )
+                zoom_status = "applied"
+            else:
+                zoom_status = "inconclusive"
+        except Exception as exc:
+            zoom_status = f"failed: {str(exc)[:120]}"
+
+    try:
+        extracted_request = PlanVerificationRequest(**parsed)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Réponse du modèle non exploitable: {exc}",
+        )
+
     # Only real facts about the call — no invented metrics.
     structured_fields = {
         "provider": "Meta Model API",
@@ -584,11 +776,13 @@ async def extract_plan_from_document(
         "viewing_projection": f"UTM {extracted_request.utm_zone.value}",
         "vision_model_id": META_VISION_MODEL_ID,
         "grounding_grid": "0-1000 (Muse Spark perception grounding)",
+        "zoom_recheck": zoom_status,
         "live_api_call": True,
     }
     return PlanExtractionResponse(
         extracted_plan=extracted_request,
         table_roi=table_roi,
+        table_crop_data_url=table_crop_data_url,
         spark_structured_fields=structured_fields,
         notes="Extraction en direct via Meta Model API (Muse Spark).",
     )

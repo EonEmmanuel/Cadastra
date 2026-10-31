@@ -1,7 +1,10 @@
 """API endpoint integration tests."""
 
+import io
+
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 import main
 from main import app, WHATSAPP_VERIFY_TOKEN
@@ -197,6 +200,56 @@ def test_api_extract_live_with_key(client, monkeypatch):
     assert data["spark_structured_fields"]["protocol"] == "chat-completions"
     assert data["spark_structured_fields"]["model_id"] == main.META_EXTRACT_MODEL_ID
     assert data["spark_structured_fields"]["beacons_extracted_count"] == 4
+
+
+def test_api_extract_zoom_recheck_corrects_beacons(client, monkeypatch):
+    """Visual zoom: beacons from the grounded crop replace first-pass values,
+    and the response exposes the actual crop the re-read was based on."""
+    monkeypatch.setitem(main.RUNTIME_CONFIG, "meta_api_key", "test-key")
+
+    async def fake_call(content_bytes, media_type, filename="plan.jpg"):
+        return {
+            "plan_id": "EXTRACT-01",
+            "locality": "Douala Yassa",
+            "region": "Littoral",
+            "utm_zone": "32N",
+            "stated_area_sqm": 980.0,
+            "coordinates_table_box": {"x_min": 60, "y_min": 430, "x_max": 940, "y_max": 900},
+            # First-pass mistake: B3 x = 583465.0 (digit misread)
+            "beacons": [
+                {"borne_id": "B1", "x": 583420.0, "y": 446100.0},
+                {"borne_id": "B2", "x": 583455.0, "y": 446100.0},
+                {"borne_id": "B3", "x": 583465.0, "y": 446072.0},
+                {"borne_id": "B4", "x": 583420.0, "y": 446072.0},
+            ],
+        }, "chat-completions"
+
+    async def fake_zoom(crop_bytes):
+        assert crop_bytes.startswith(b"\x89PNG")
+        return {
+            "beacons": [
+                {"borne_id": "B1", "x": 583420.0, "y": 446100.0},
+                {"borne_id": "B2", "x": 583455.0, "y": 446100.0},
+                {"borne_id": "B3", "x": 583455.0, "y": 446072.0},
+                {"borne_id": "B4", "x": 583420.0, "y": 446072.0},
+            ],
+        }
+
+    monkeypatch.setattr(main, "call_spark_extraction", fake_call)
+    monkeypatch.setattr(main, "_recheck_beacons_via_chat_completions", fake_zoom)
+
+    png = io.BytesIO()
+    Image.new("RGB", (120, 160), color=(20, 22, 26)).save(png, format="PNG")
+    response = client.post(
+        "/api/extract",
+        files={"file": ("plan.png", png.getvalue(), "image/png")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["spark_structured_fields"]["zoom_recheck"] == "applied"
+    assert data["table_crop_data_url"].startswith("data:image/png;base64,")
+    # Corrected reading from the zoom pass (B3 x = 583455.0)
+    assert data["extracted_plan"]["beacons"][2]["x"] == 583455.0
 
 
 def test_api_extract_pdf_routes_through_files_api(client, monkeypatch):
