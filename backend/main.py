@@ -50,6 +50,51 @@ TEST_DATA_DIR = Path(__file__).resolve().parent.parent / "test_data"
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "cadastra_cameroon_secret_token_2026")
 
 
+# Global runtime API configuration (can be updated dynamically via UI)
+RUNTIME_CONFIG = {
+    "whatsapp_token": os.getenv("WHATSAPP_TOKEN", ""),
+    "phone_number_id": os.getenv("PHONE_NUMBER_ID", ""),
+    "whatsapp_verify_token": os.getenv("WHATSAPP_VERIFY_TOKEN", "cadastra_cameroon_secret_token_2026"),
+    "meta_llama_key": os.getenv("META_LLAMA_KEY", ""),
+    "webhook_url": "http://localhost:8000/api/webhook/whatsapp",
+}
+
+
+@app.get("/api/config")
+def get_runtime_config():
+    """Return current API and webhook integration configuration."""
+    return {
+        "whatsapp_token_configured": bool(RUNTIME_CONFIG["whatsapp_token"]),
+        "phone_number_id": RUNTIME_CONFIG["phone_number_id"],
+        "whatsapp_verify_token": RUNTIME_CONFIG["whatsapp_verify_token"],
+        "meta_llama_key_configured": bool(RUNTIME_CONFIG["meta_llama_key"]),
+        "webhook_url": RUNTIME_CONFIG["webhook_url"],
+    }
+
+
+@app.post("/api/config")
+def update_runtime_config(payload: Dict[str, str]):
+    """Update Meta WhatsApp Cloud API credentials and Llama API keys dynamically."""
+    if "whatsapp_token" in payload:
+        RUNTIME_CONFIG["whatsapp_token"] = payload["whatsapp_token"]
+    if "phone_number_id" in payload:
+        RUNTIME_CONFIG["phone_number_id"] = payload["phone_number_id"]
+    if "whatsapp_verify_token" in payload:
+        RUNTIME_CONFIG["whatsapp_verify_token"] = payload["whatsapp_verify_token"]
+        global WHATSAPP_VERIFY_TOKEN
+        WHATSAPP_VERIFY_TOKEN = payload["whatsapp_verify_token"]
+    if "meta_llama_key" in payload:
+        RUNTIME_CONFIG["meta_llama_key"] = payload["meta_llama_key"]
+    if "webhook_url" in payload:
+        RUNTIME_CONFIG["webhook_url"] = payload["webhook_url"]
+
+    return {
+        "status": "success",
+        "message": "Configuration API mise à jour avec succès.",
+        "config": get_runtime_config(),
+    }
+
+
 @app.get("/health")
 def health_check():
     """Health check endpoint."""
