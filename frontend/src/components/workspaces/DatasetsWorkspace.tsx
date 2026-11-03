@@ -183,15 +183,15 @@ export default function DatasetsWorkspace({
               return (
                 <article
                   key={profile.filename}
-                  className="flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 transition hover:border-white/[0.16] hover:bg-white/[0.035]"
+                  className="flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-[#040711]/60 backdrop-blur-md p-4 transition hover:border-[#60A5FA]/30 hover:bg-[#040711]/90"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="truncate font-mono text-sm font-semibold text-white">
+                        <h3 className="truncate font-mono text-sm font-bold text-white">
                           {profile.plan_id}
                         </h3>
-                        <p className="mt-0.5 truncate text-[10px] text-zinc-500">
+                        <p className="mt-0.5 truncate text-xs text-zinc-400">
                           {profile.filename}
                         </p>
                       </div>
@@ -201,7 +201,7 @@ export default function DatasetsWorkspace({
                             ? "border-red-500/25 bg-red-500/[0.08] text-red-400"
                             : expectation.tone === "warning"
                             ? "border-amber-500/25 bg-amber-500/[0.08] text-amber-400"
-                            : "border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-400"
+                            : "border-[#00DF8F]/30 bg-[#00DF8F]/10 text-[#00DF8F]"
                         }`}
                       >
                         {expectation.tone === "success" ? (
@@ -212,38 +212,38 @@ export default function DatasetsWorkspace({
                       </span>
                     </div>
 
-                    <p className="mt-3 flex items-center gap-1.5 text-xs text-zinc-300">
-                      <MapPin className="h-3 w-3 shrink-0 text-zinc-600" />
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-zinc-200 font-medium">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
                       <span className="truncate">{profile.locality}</span>
                     </p>
-                    <p className="mt-1 text-[10px] text-zinc-500">
+                    <p className="mt-1 text-xs text-zinc-400">
                       {profile.region} · {profile.title_number || "Titre en cours"}
                     </p>
 
-                    <div className="mt-3 grid grid-cols-3 gap-1.5 font-mono text-[10px]">
-                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-1.5">
-                        <span className="block text-zinc-600">Surface</span>
-                        <span className="text-zinc-200">
+                    <div className="mt-3 grid grid-cols-3 gap-1.5 font-mono text-xs">
+                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
+                        <span className="block text-zinc-400 text-[11px]">Surface</span>
+                        <span className="text-zinc-100 font-bold">
                           {Math.round(profile.stated_area_sqm).toLocaleString()} m²
                         </span>
                       </div>
-                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-1.5">
-                        <span className="block text-zinc-600">Zone</span>
-                        <span className="text-zinc-200">{profile.utm_zone}</span>
+                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
+                        <span className="block text-zinc-400 text-[11px]">Zone</span>
+                        <span className="text-[#93C5FD] font-bold">{profile.utm_zone}</span>
                       </div>
-                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-1.5">
-                        <span className="block text-zinc-600">Bornes</span>
-                        <span className="text-zinc-200">{profile.num_beacons}</span>
+                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
+                        <span className="block text-zinc-400 text-[11px]">Bornes</span>
+                        <span className="text-zinc-100 font-bold">{profile.num_beacons}</span>
                       </div>
                     </div>
 
                     <p
-                      className={`mt-3 text-[10px] ${
+                      className={`mt-3 text-xs font-semibold ${
                         expectation.tone === "danger"
-                          ? "text-red-400/90"
+                          ? "text-red-400"
                           : expectation.tone === "warning"
-                          ? "text-amber-400/90"
-                          : "text-emerald-400/90"
+                          ? "text-amber-400"
+                          : "text-[#00DF8F]"
                       }`}
                     >
                       {expectation.label} · {expectation.detail}
@@ -251,20 +251,20 @@ export default function DatasetsWorkspace({
                   </div>
 
                   <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3">
-                    <span className="flex items-center gap-1 font-mono text-[10px] text-zinc-600">
-                      <Layers className="h-3 w-3" />
+                    <span className="flex items-center gap-1.5 font-mono text-xs text-zinc-400">
+                      <Layers className="h-3.5 w-3.5 text-[#60A5FA]" />
                       {profile.filename.endsWith(".json") ? "JSON" : "profil"}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleLoadProfile(profile)}
                       disabled={isLoading}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-60"
                     >
                       {isLoading ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <Crosshair className="h-3 w-3" />
+                        <Crosshair className="h-3.5 w-3.5" />
                       )}
                       {isLoading ? "Chargement…" : "Vérifier"}
                     </button>

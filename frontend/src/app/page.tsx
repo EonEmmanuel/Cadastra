@@ -40,11 +40,14 @@ export default function CadastraApp() {
   const [currentRequest, setCurrentRequest] = useState<PlanVerificationRequest | null>(null);
   const [verificationResult, setVerificationResult] = useState<PlanVerificationResponse | null>(null);
   const [selectedBorneId, setSelectedBorneId] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isDossierCollapsed, setIsDossierCollapsed] = useState<boolean>(false);
 
   // Every completed audit stays in the session so investigations, reports and
   // analytics read one real, shared list instead of separate mock data.
   const [history, setHistory] = useState<VerificationRecord[]>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [isSessionRestored, setIsSessionRestored] = useState<boolean>(false);
 
   // Check URL query parameter for direct view switching
   React.useEffect(() => {
@@ -80,12 +83,14 @@ export default function CadastraApp() {
       }
     } catch (e) {
       console.warn("Could not restore session from storage", e);
+    } finally {
+      setIsSessionRestored(true);
     }
   }, []);
 
-  // Persist current request & verification result across reloads
+  // Persist current request & verification result across reloads (ONLY after session restoration is complete)
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !isSessionRestored) return;
     try {
       if (currentRequest) {
         sessionStorage.setItem("cadastra_current_request", JSON.stringify(currentRequest));
@@ -93,10 +98,10 @@ export default function CadastraApp() {
         sessionStorage.removeItem("cadastra_current_request");
       }
     } catch {}
-  }, [currentRequest]);
+  }, [currentRequest, isSessionRestored]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !isSessionRestored) return;
     try {
       if (verificationResult) {
         sessionStorage.setItem("cadastra_verification_result", JSON.stringify(verificationResult));
@@ -104,16 +109,16 @@ export default function CadastraApp() {
         sessionStorage.removeItem("cadastra_verification_result");
       }
     } catch {}
-  }, [verificationResult]);
+  }, [verificationResult, isSessionRestored]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !isSessionRestored) return;
     try {
       if (history.length > 0) {
         sessionStorage.setItem("cadastra_history", JSON.stringify(history));
       }
     } catch {}
-  }, [history]);
+  }, [history, isSessionRestored]);
 
   // Probe the real backend once so the status chip is truthful before the
   // first verification (local fallback is labelled as such, never hidden).
@@ -229,6 +234,26 @@ export default function CadastraApp() {
     },
     [commitVerification]
   );
+
+  // Auto-load profile or sample parcel if requested in query parameters
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const requestedProfile = params.get("profile") || params.get("sample");
+    if (requestedProfile) {
+      fetch(`${API_BASE}/api/profiles/${requestedProfile}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((plan) => {
+          if (plan) {
+            setCurrentRequest(plan);
+            runVerification(plan, "dataset");
+            setViewMode("dashboard");
+            setActiveNavTab("carte");
+          }
+        })
+        .catch(() => {});
+    }
+  }, [runVerification]);
 
   // When a plan is uploaded or submitted from the Landing Hero:
   // Open the Human-in-the-Loop AI Vision Review Modal first for uploads,
@@ -389,8 +414,8 @@ export default function CadastraApp() {
           />
         </>
       ) : (
-        // GEOSPATIAL INSPECTION DASHBOARD (Satellite Map + Forensic Dossier Panel)
-        <div className="h-full w-full flex flex-col overflow-hidden">
+        // GEOSPATIAL INSPECTION DASHBOARD (Full-Bleed Map + Floating Glass Docks)
+        <div className="h-full w-full flex flex-col overflow-hidden bg-[#03060E]">
           {/* Top Dashboard Header */}
           <Navbar
             onOpenUploadHub={() => setViewMode("landing")}
@@ -401,109 +426,153 @@ export default function CadastraApp() {
             isInDashboardView={true}
           />
 
-          {/* Main Dashboard Layout */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Left Vertical Icon Rail */}
-            <Sidebar
-              activeTab={activeNavTab}
-              recordCount={history.length}
-              onTabChange={(tab) => {
-                if (tab === "accueil") {
-                  setViewMode("landing");
-                } else {
-                  setActiveNavTab(tab);
+          {/* Main Dashboard Canvas Layout: Map Extends Full-Bleed Behind Everything */}
+          <div className="flex-1 relative overflow-hidden">
+            {/* 1. FULL-BLEED SATELLITE MAP (Foundational Canvas) */}
+            <div className="absolute inset-0 z-0">
+              <CadastralSatelliteMap
+                planId={currentRequest?.plan_id || "En attente de plan"}
+                beacons={verificationResult?.beacons_wgs84 || []}
+                centroid={verificationResult?.centroid_wgs84}
+                boundarySegments={verificationResult?.boundary_segments || []}
+                riskLevel={verificationResult?.risk_level || "LOW"}
+                statedArea={currentRequest?.stated_area_sqm || 0}
+                computedArea={verificationResult?.computed_area_sqm || 0}
+                discrepancySqm={verificationResult?.discrepancy_sqm || 0}
+                locality={currentRequest?.locality || "Cameroun (WGS84)"}
+                utmZone={currentRequest?.utm_zone || "32N"}
+                epsgCode={verificationResult?.epsg_code}
+                selectedBorneId={selectedBorneId}
+                onSelectBorne={setSelectedBorneId}
+                leftOffset={isSidebarCollapsed ? 64 + 16 : 208 + 16}
+                rightOffset={
+                  isDossierCollapsed || !verificationResult ? 16 : 420 + 16
                 }
-              }}
-              onOpenApiSettings={() => setIsApiSettingsOpen(true)}
-            />
+              />
+            </div>
 
+            {/* 2. LEFT FLOATING CAPSULE SIDEBAR (Image 1 Style) */}
+            <div className="absolute left-4 top-4 bottom-4 z-20 pointer-events-auto">
+              <Sidebar
+                activeTab={activeNavTab}
+                recordCount={history.length}
+                onTabChange={(tab) => {
+                  if (tab === "accueil") {
+                    setViewMode("landing");
+                  } else {
+                    setActiveNavTab(tab);
+                  }
+                }}
+                onOpenApiSettings={() => setIsApiSettingsOpen(true)}
+                isCollapsed={isSidebarCollapsed}
+                onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+              />
+            </div>
+
+            {/* 3. WORKSPACE CONTENT OVERLAY */}
             {activeNavTab === "carte" ? (
-              /* Central Workspace: Map (Center) + Forensic Dossier (Right) */
-              <main className="flex-1 p-3 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-3 bg-[#060709]">
-                {/* Satellite Cadastral Map Viewport */}
-                <section className="flex-1 h-[52vh] shrink-0 lg:h-full relative overflow-hidden flex flex-col">
-                  <CadastralSatelliteMap
-                    planId={currentRequest?.plan_id || "En attente de plan"}
-                    beacons={verificationResult?.beacons_wgs84 || []}
-                    centroid={verificationResult?.centroid_wgs84}
-                    boundarySegments={verificationResult?.boundary_segments || []}
-                    riskLevel={verificationResult?.risk_level || "LOW"}
-                    statedArea={currentRequest?.stated_area_sqm || 0}
-                    computedArea={verificationResult?.computed_area_sqm || 0}
-                    discrepancySqm={verificationResult?.discrepancy_sqm || 0}
-                    locality={currentRequest?.locality || "Cameroun (WGS84)"}
-                    utmZone={currentRequest?.utm_zone || "32N"}
-                    epsgCode={verificationResult?.epsg_code}
-                    selectedBorneId={selectedBorneId}
-                    onSelectBorne={setSelectedBorneId}
-                  />
+              <>
+                {/* Right Floating Forensic Dossier (Image 2 Style) */}
+                {verificationResult && (
+                  <div
+                    className={`absolute right-4 top-4 bottom-4 z-20 pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                      isDossierCollapsed
+                        ? "translate-x-[calc(100%+2rem)] opacity-0 pointer-events-none"
+                        : "translate-x-0 opacity-100 w-[420px] max-w-[calc(100vw-6rem)]"
+                    }`}
+                  >
+                    <ForensicDossierPanel
+                      result={verificationResult}
+                      request={currentRequest}
+                      isLoading={isLoading}
+                      onDownloadPdf={() => handleDownloadPdf()}
+                      isDownloadingPdf={downloadingId === "current"}
+                      selectedBorneId={selectedBorneId}
+                      onSelectBorne={setSelectedBorneId}
+                      isCollapsed={isDossierCollapsed}
+                      onToggleCollapse={() => setIsDossierCollapsed(true)}
+                    />
+                  </div>
+                )}
 
-                  {/* Empty state: the map is real, but no parcel has been loaded yet */}
-                  {!verificationResult && !isLoading && (
-                    <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-[#060709]/55 p-4 backdrop-blur-[2px]">
-                      <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#090B10]/95 p-6 text-center shadow-2xl">
-                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
-                          <Layers3 className="h-5 w-5 text-zinc-400" />
-                        </div>
-                        <h2 className="text-sm font-semibold text-white">
-                          Aucune parcelle chargée
-                        </h2>
-                        <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-                          Importez un plan de bornage ou chargez un profil de
-                          référence pour afficher les bornes B1…Bn et le dossier
-                          forensique.
-                        </p>
-                        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
-                          <button
-                            type="button"
-                            onClick={() => setViewMode("landing")}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200"
-                          >
-                            <UploadCloud className="h-3.5 w-3.5" />
-                            Importer un plan
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsCustomPlanOpen(true)}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
-                          >
-                            <Crosshair className="h-3.5 w-3.5" />
-                            Saisie manuelle
-                          </button>
-                        </div>
+                {/* Floating Reopen Button when Dossier is Minimized */}
+                {verificationResult && isDossierCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDossierCollapsed(false)}
+                    title="Afficher le dossier d'audit"
+                    className="absolute right-4 top-4 z-20 pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#040711]/90 backdrop-blur-xl border border-white/[0.08] text-xs font-semibold text-white shadow-2xl hover:bg-white/[0.08] transition"
+                  >
+                    <FileText className="w-4 h-4 text-[#60A5FA]" />
+                    <span>Dossier d&apos;audit</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#60A5FA] shadow-[0_0_8px_#60A5FA]" />
+                  </button>
+                )}
+
+                {/* Empty State Overlay */}
+                {!verificationResult && !isLoading && !isCustomPlanOpen && (
+                  <div
+                    className="absolute inset-0 z-10 flex items-center justify-center p-4 pointer-events-none transition-all duration-300"
+                    style={{
+                      paddingLeft: isSidebarCollapsed
+                        ? `${64 + 32}px`
+                        : `${208 + 32}px`,
+                    }}
+                  >
+                    <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#090B10]/95 p-6 text-center shadow-2xl backdrop-blur-md pointer-events-auto">
+                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
+                        <Layers3 className="h-5 w-5 text-zinc-400" />
+                      </div>
+                      <h2 className="text-sm font-semibold text-white">
+                        Aucune parcelle chargée
+                      </h2>
+                      <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                        Importez un plan de bornage ou chargez un profil de
+                        référence pour afficher les bornes B1…Bn et le dossier
+                        forensique.
+                      </p>
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
                         <button
                           type="button"
-                          onClick={() => setActiveNavTab("donnees")}
-                          className="mt-3 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500 transition hover:text-zinc-300"
+                          onClick={() => setViewMode("landing")}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200"
                         >
-                          <FileText className="h-3 w-3" />
-                          Ou parcourir les jeux de données
+                          <UploadCloud className="h-3.5 w-3.5" />
+                          Importer un plan
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomPlanOpen(true)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+                        >
+                          <Crosshair className="h-3.5 w-3.5" />
+                          Saisie manuelle
                         </button>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveNavTab("donnees")}
+                        className="mt-3 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500 transition hover:text-zinc-300"
+                      >
+                        <FileText className="h-3 w-3" />
+                        Ou parcourir les jeux de données
+                      </button>
                     </div>
-                  )}
-                </section>
-
-                {/* Forensic Cadastral Dossier Panel */}
-                <section className="w-full lg:w-[410px] xl:w-[440px] h-auto min-h-[460px] lg:h-full shrink-0 flex flex-col">
-                  <ForensicDossierPanel
-                    result={verificationResult}
-                    request={currentRequest}
-                    isLoading={isLoading}
-                    onDownloadPdf={() => handleDownloadPdf()}
-                    isDownloadingPdf={downloadingId === "current"}
-                    selectedBorneId={selectedBorneId}
-                    onSelectBorne={setSelectedBorneId}
-                  />
-                </section>
-              </main>
+                  </div>
+                )}
+              </>
             ) : (
-              /* Secondary workspaces: investigations, reports, datasets, AI */
-              <main className="flex-1 overflow-hidden bg-[#03060E] p-3">
-                <div className="h-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#040711] p-4 sm:p-5">
-                  {renderWorkspace()}
-                </div>
-              </main>
+              /* Secondary workspaces floating over the full-bleed map */
+              <div
+                className="absolute top-4 bottom-4 right-4 z-20 pointer-events-auto overflow-hidden rounded-2xl border border-white/[0.08] bg-[#040711]/95 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 transition-all duration-300"
+                style={{
+                  left: isSidebarCollapsed
+                    ? `${64 + 32}px`
+                    : `${208 + 32}px`,
+                }}
+              >
+                {renderWorkspace()}
+              </div>
             )}
           </div>
         </div>

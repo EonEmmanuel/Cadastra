@@ -136,7 +136,7 @@ export default function InvestigationsWorkspace({
                   key={item.id}
                   type="button"
                   onClick={() => setFilter(item.id)}
-                  className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition ${
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     filter === item.id
                       ? "bg-white text-black shadow"
                       : "text-zinc-400 hover:text-white"
@@ -148,12 +148,12 @@ export default function InvestigationsWorkspace({
             </div>
 
             <label className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2">
-              <Search className="h-3.5 w-3.5 text-zinc-500" />
+              <Search className="h-3.5 w-3.5 text-zinc-400" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Rechercher un plan, une localité, un titre…"
-                className="w-full bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none sm:w-64"
+                className="w-full bg-transparent text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none sm:w-64"
               />
             </label>
           </div>
@@ -161,15 +161,15 @@ export default function InvestigationsWorkspace({
           <div className="flex-1 overflow-auto rounded-2xl border border-white/[0.08]">
             <table className="w-full min-w-[760px] border-collapse text-left text-xs">
               <thead className="sticky top-0 z-10 bg-[#090B10]">
-                <tr className="border-b border-white/[0.08] font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-                  <th className="px-4 py-3 font-medium">Dossier</th>
-                  <th className="px-4 py-3 font-medium">Localité</th>
-                  <th className="px-4 py-3 font-medium">Zone</th>
-                  <th className="px-4 py-3 text-right font-medium">Déclarée</th>
-                  <th className="px-4 py-3 text-right font-medium">Calculée</th>
-                  <th className="px-4 py-3 text-right font-medium">Écart</th>
-                  <th className="px-4 py-3 font-medium">Verdict</th>
-                  <th className="px-4 py-3 text-right font-medium">Action</th>
+                <tr className="border-b border-white/[0.08] font-mono text-xs uppercase tracking-wider text-zinc-400">
+                  <th className="px-4 py-3 font-semibold">Dossier</th>
+                  <th className="px-4 py-3 font-semibold">Localité</th>
+                  <th className="px-4 py-3 font-semibold">Zone</th>
+                  <th className="px-4 py-3 text-right font-semibold">Déclarée</th>
+                  <th className="px-4 py-3 text-right font-semibold">Calculée</th>
+                  <th className="px-4 py-3 text-right font-semibold">Écart</th>
+                  <th className="px-4 py-3 font-semibold">Verdict</th>
+                  <th className="px-4 py-3 text-right font-semibold">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,10 +177,10 @@ export default function InvestigationsWorkspace({
                   const verdict = getVerdict(record.result);
                   const toneClass =
                     verdict.tone === "danger"
-                      ? "bg-red-500/10 text-red-300 border-red-500/25"
+                      ? "bg-red-500/15 text-red-300 border-red-500/30"
                       : verdict.tone === "warning"
-                      ? "bg-amber-500/10 text-amber-300 border-amber-500/25"
-                      : "bg-emerald-500/10 text-emerald-300 border-emerald-500/25";
+                      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                      : "bg-[#00DF8F]/15 text-[#00DF8F] border-[#00DF8F]/30";
                   const delta = record.result.discrepancy_percentage;
 
                   return (
@@ -191,19 +191,19 @@ export default function InvestigationsWorkspace({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {verdict.tone === "success" ? (
-                            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                            <ShieldCheck className="h-4 w-4 shrink-0 text-[#00DF8F]" />
                           ) : (
                             <ShieldAlert
-                              className={`h-3.5 w-3.5 shrink-0 ${
+                              className={`h-4 w-4 shrink-0 ${
                                 verdict.tone === "danger" ? "text-red-400" : "text-amber-400"
                               }`}
                             />
                           )}
                           <div className="min-w-0">
-                            <p className="truncate font-mono font-semibold text-white">
+                            <p className="truncate font-mono text-xs font-bold text-white">
                               {record.result.plan_id}
                             </p>
-                            <p className="truncate text-[10px] text-zinc-500">
+                            <p className="truncate text-xs text-zinc-400 mt-0.5">
                               {record.request.title_number || "Titre en cours"} ·{" "}
                               {getSourceLabel(record.source)}
                             </p>
@@ -212,25 +212,25 @@ export default function InvestigationsWorkspace({
                       </td>
                       <td className="px-4 py-3 text-zinc-300">
                         <span className="flex items-center gap-1.5">
-                          <MapPin className="h-3 w-3 text-zinc-600" />
-                          <span className="truncate">{record.request.locality}</span>
+                          <MapPin className="h-3.5 w-3.5 text-zinc-500" />
+                          <span className="truncate text-xs font-medium text-zinc-200">{record.request.locality}</span>
                         </span>
-                        <span className="mt-0.5 block text-[10px] text-zinc-500">
+                        <span className="mt-0.5 block text-xs text-zinc-400">
                           {record.request.region}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono text-zinc-400">
+                      <td className="px-4 py-3 font-mono text-xs font-medium text-[#93C5FD]">
                         {record.result.utm_zone}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-zinc-300">
+                      <td className="px-4 py-3 text-right font-mono text-xs text-zinc-200">
                         {Math.round(record.result.stated_area_sqm).toLocaleString()} m²
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-zinc-300">
+                      <td className="px-4 py-3 text-right font-mono text-xs text-zinc-200">
                         {Math.round(record.result.computed_area_sqm).toLocaleString()} m²
                       </td>
                       <td
-                        className={`px-4 py-3 text-right font-mono font-semibold ${
-                          Math.abs(delta) > 1 ? "text-red-400" : "text-emerald-400"
+                        className={`px-4 py-3 text-right font-mono text-xs font-bold ${
+                          Math.abs(delta) > 1 ? "text-red-400" : "text-[#00DF8F]"
                         }`}
                       >
                         {delta > 0 ? "+" : ""}
@@ -238,11 +238,11 @@ export default function InvestigationsWorkspace({
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold ${toneClass}`}
+                          className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toneClass}`}
                         >
                           {verdict.label}
                         </span>
-                        <span className="mt-1 block text-[10px] text-zinc-600">
+                        <span className="mt-1 block text-xs text-zinc-400">
                           {formatRecordDate(record.timestamp)}
                         </span>
                       </td>

@@ -7,7 +7,6 @@ import {
   Trash2,
   Compass,
   FileSpreadsheet,
-  Wand2,
 } from "lucide-react";
 import { BeaconInput, PlanVerificationRequest } from "@/types/cadastre";
 
@@ -185,7 +184,7 @@ export default function CustomPlanModal({
               className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
               title="Remplir avec une parcelle réelle de test_data"
             >
-              <Wand2 className="w-3 h-3" />
+              <FileSpreadsheet className="w-3 h-3 text-[#60A5FA]" />
               Exemple Douala
             </button>
             <button

@@ -24,6 +24,10 @@ try:
     from pypdf import PdfReader
 except ImportError:  # Clear runtime error below when an environment is incomplete.
     PdfReader = None
+try:
+    import pypdfium2 as pdfium
+except ImportError:
+    pdfium = None
 
 # Load backend/.env (git-ignored) so a plain "uvicorn backend.main:app" run
 # picks up META_API_KEY, WHATSAPP_TOKEN, PHONE_NUMBER_ID and
@@ -726,35 +730,70 @@ def _has_usable_embedded_coordinate_text(text: str) -> bool:
 
 
 def _render_scanned_pdf_first_page(content_bytes: bytes, dpi: int = 350) -> bytes:
-    """Rasterize page one of a scan at OCR-safe resolution with Poppler."""
-    renderer = shutil.which("pdftoppm")
-    if not renderer:
-        raise RuntimeError("Le moteur Poppler pdftoppm est introuvable pour rendre le PDF scanné.")
-    # Some Windows sandbox configurations deny Python's global temp directory.
-    # A project-local ignored directory is writable for the backend and still
-    # cleaned after every conversion.
-    runtime_temp_root = Path(__file__).resolve().parent / ".cadastra_runtime_tmp"
-    runtime_temp_root.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="pdf_", dir=runtime_temp_root) as temp_dir:
-        temp_path = Path(temp_dir)
-        source = temp_path / "source.pdf"
-        output_prefix = temp_path / "page"
-        source.write_bytes(content_bytes)
+    """Rasterize page one of a scan at OCR-safe resolution with pypdfium2, pypdf, or Poppler."""
+    # 1. Primary: pypdfium2 (Chromium PDFium, in-process, cross-platform, zero system binaries needed)
+    if pdfium is not None:
         try:
-            completed = subprocess.run(
-                [renderer, "-f", "1", "-l", "1", "-r", str(dpi), "-png", str(source), str(output_prefix)],
-                capture_output=True,
-                text=True,
-                timeout=45,
-                check=False,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError("Le rendu du PDF scanné a dépassé le délai autorisé.") from exc
-        rendered_pages = list(temp_path.glob("page-*.png"))
-        if completed.returncode != 0 or not rendered_pages:
-            detail = (completed.stderr or completed.stdout or "erreur inconnue")[:180]
-            raise RuntimeError(f"Impossible de rendre le PDF scanné: {detail}")
-        return rendered_pages[0].read_bytes()
+            doc = pdfium.PdfDocument(content_bytes)
+            if len(doc) > 0:
+                page = doc[0]
+                # Scale factor: 72 points per inch in PDF spec -> scale = dpi / 72.0
+                bitmap = page.render(scale=dpi / 72.0)
+                pil_image = bitmap.to_pil()
+                # Bound maximum dimension to 2600px to ensure fast upload and prevent Meta API timeout while keeping high visual clarity
+                if max(pil_image.size) > 2600:
+                    pil_image.thumbnail((2600, 2600), Image.Resampling.LANCZOS)
+                out = io.BytesIO()
+                pil_image.save(out, format="PNG")
+                return out.getvalue()
+        except Exception:
+            pass
+
+    # 2. Secondary fallback: direct extraction of embedded scanner image via pypdf
+    if PdfReader is not None:
+        try:
+            reader = PdfReader(io.BytesIO(content_bytes))
+            if len(reader.pages) > 0:
+                page = reader.pages[0]
+                if page.images and len(page.images) > 0:
+                    largest_image = max(page.images, key=lambda img: len(img.data))
+                    img_pil = Image.open(io.BytesIO(largest_image.data))
+                    if max(img_pil.size) > 2600:
+                        img_pil.thumbnail((2600, 2600), Image.Resampling.LANCZOS)
+                    out = io.BytesIO()
+                    img_pil.save(out, format="PNG")
+                    return out.getvalue()
+        except Exception:
+            pass
+
+    # 3. Tertiary fallback: external Poppler pdftoppm if installed on system PATH
+    renderer = shutil.which("pdftoppm")
+    if renderer:
+        runtime_temp_root = Path(__file__).resolve().parent / ".cadastra_runtime_tmp"
+        runtime_temp_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="pdf_", dir=runtime_temp_root) as temp_dir:
+            temp_path = Path(temp_dir)
+            source = temp_path / "source.pdf"
+            output_prefix = temp_path / "page"
+            source.write_bytes(content_bytes)
+            try:
+                completed = subprocess.run(
+                    [renderer, "-f", "1", "-l", "1", "-r", str(dpi), "-png", str(source), str(output_prefix)],
+                    capture_output=True,
+                    text=True,
+                    timeout=45,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError("Le rendu du PDF scanné a dépassé le délai autorisé.") from exc
+            rendered_pages = list(temp_path.glob("page-*.png"))
+            if completed.returncode == 0 and rendered_pages:
+                return rendered_pages[0].read_bytes()
+
+    raise RuntimeError(
+        "Impossible de convertir le PDF scanné en image. "
+        "Le moteur de rendu pypdfium2 et l'utilitaire système Poppler pdftoppm sont tous deux indisponibles."
+    )
 
 
 async def _extract_editable_pdf_text(text: str) -> Dict[str, Any]:
@@ -924,7 +963,16 @@ async def extract_plan_from_document(
             )
     except HTTPException:
         raise
-    except (json.JSONDecodeError, ValidationError, KeyError, ValueError, TypeError) as exc:
+    except ValidationError as exc:
+        error_msg = "; ".join(f"{e.get('loc', [''])[0]}: {e.get('msg', '')}" for e in exc.errors())
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Coordonnées cadastrales incomplètes dans le document: {error_msg}. "
+                "Vérifiez que le plan scanné comporte un tableau de bornes lisible avec coordonnées X, Y et superficie."
+            ),
+        )
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Réponse du modèle non exploitable: {exc}",

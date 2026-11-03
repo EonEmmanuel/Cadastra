@@ -37,15 +37,21 @@ export interface CadastralSatelliteMapProps {
   epsgCode?: string;
   selectedBorneId?: string | null;
   onSelectBorne?: (borneId: string | null) => void;
+  leftOffset?: number;
+  rightOffset?: number;
 }
 
-// Auto Bounds Fitter
+// Auto Bounds Fitter with Dynamic Asymmetrical Viewport Padding
 function MapBoundsController({
   beacons,
   fitKey,
+  leftOffset = 80,
+  rightOffset = 450,
 }: {
   beacons: BeaconWGS84[];
   fitKey: number;
+  leftOffset?: number;
+  rightOffset?: number;
 }) {
   const map = useMap();
 
@@ -56,12 +62,18 @@ function MapBoundsController({
         beacons.map((b) => [b.latitude, b.longitude] as [number, number])
       );
       if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 18, animate: true });
+        map.invalidateSize();
+        map.fitBounds(bounds, {
+          paddingTopLeft: [leftOffset + 40, 80],
+          paddingBottomRight: [rightOffset + 40, 80],
+          maxZoom: 19,
+          animate: true,
+        });
       }
     } catch (e) {
       console.warn("Bounds fit error", e);
     }
-  }, [beacons, map, fitKey]);
+  }, [beacons, map, fitKey, leftOffset, rightOffset]);
 
   return null;
 }
@@ -110,6 +122,8 @@ export default function CadastralSatelliteMapInner({
   epsgCode = "EPSG:32632",
   selectedBorneId,
   onSelectBorne,
+  leftOffset = 80,
+  rightOffset = 450,
 }: CadastralSatelliteMapProps) {
   const isCritical = riskLevel === "CRITICAL_FRAUD";
   const isAnomaly = riskLevel === "HIGH" || riskLevel === "MEDIUM";
@@ -117,7 +131,7 @@ export default function CadastralSatelliteMapInner({
   const [tileMode, setTileMode] = useState<"satellite" | "carte" | "mixte">("satellite");
   const [showMeasure, setShowMeasure] = useState<boolean>(true);
   const [fitKey, setFitKey] = useState<number>(0);
-  const [zoom, setZoom] = useState<number>(18);
+  const [zoom, setZoom] = useState<number>(19);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -163,14 +177,14 @@ export default function CadastralSatelliteMapInner({
     return L.divIcon({
       className: "beacon-marker-icon",
       html: `
-        <div class="flex items-center justify-center w-6 h-6 rounded-lg font-mono text-[10px] font-bold shadow-xl transition-all ${tone} ${
+        <div class="flex items-center justify-center w-7 h-7 rounded-lg font-mono text-xs font-bold shadow-xl transition-all ${tone} ${
         isSelected ? "scale-125 ring-2 ring-white" : ""
       }">
           ${borneId}
         </div>
       `,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
     });
   };
 
@@ -196,15 +210,15 @@ export default function CadastralSatelliteMapInner({
     return L.divIcon({
       className: "map-overlay-marker",
       html: `
-        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-md shadow-lg text-[10px] whitespace-nowrap ${tone}">
-          <span class="w-1.5 h-1.5 rounded-full ${dot} shrink-0"></span>
-          <span class="font-medium text-zinc-300 font-sans tracking-tight">${title}</span>
+        <div class="flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-md shadow-xl text-xs whitespace-nowrap ${tone}">
+          <span class="w-2 h-2 rounded-full ${dot} shrink-0"></span>
+          <span class="font-medium text-zinc-200 font-sans tracking-tight">${title}</span>
           <span class="text-zinc-500 font-mono">·</span>
           <span class="font-bold font-mono text-white">${subtitle}</span>
         </div>
       `,
-      iconSize: [150, 26],
-      iconAnchor: [75, 13],
+      iconSize: [170, 28],
+      iconAnchor: [85, 14],
     });
   };
 
@@ -213,20 +227,26 @@ export default function CadastralSatelliteMapInner({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full rounded-2xl bg-[#040711] flex flex-col overflow-hidden shadow-2xl relative select-none font-sans border border-white/[0.08]"
+      className="w-full h-full relative select-none font-sans overflow-hidden bg-[#03060E]"
     >
-      {/* 1. TOP CONTROL BAR ABOVE MAP */}
-      <div className="h-12 px-4 flex items-center justify-between gap-4 bg-[#040711] border-b border-white/[0.06] shrink-0 z-20">
-        {/* Left: Location indicator */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] text-xs font-medium text-zinc-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00DF8F]" />
+      {/* 1. TOP FLOATING HUD OVER MAP (Dynamically offset between docks) */}
+      <div
+        className="absolute top-4 z-[1000] pointer-events-none transition-all duration-300 flex items-center justify-between gap-3"
+        style={{
+          left: `${leftOffset + 16}px`,
+          right: `${rightOffset + 16}px`,
+        }}
+      >
+        {/* Left: Location & Parcel Stats */}
+        <div className="pointer-events-auto flex items-center gap-2 p-1.5 rounded-2xl bg-[#040711]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.05] text-xs sm:text-[13px] font-semibold text-zinc-100">
+            <span className="w-2 h-2 rounded-full bg-[#00DF8F]" />
             <span>{locality}</span>
-            <span className="text-[10px] font-mono text-zinc-500">({utmZone})</span>
+            <span className="text-xs font-mono font-semibold text-[#93C5FD]">({utmZone})</span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.02] text-xs text-zinc-400">
-            <Layers className="w-3.5 h-3.5 text-zinc-500" />
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.02] text-xs font-mono text-zinc-300 font-medium">
+            <Layers className="w-3.5 h-3.5 text-[#60A5FA]" />
             <span>
               {beacons.length > 0
                 ? `${beacons.length} bornes · ${Math.round(
@@ -237,34 +257,34 @@ export default function CadastralSatelliteMapInner({
           </div>
         </div>
 
-        {/* Right: Map Layer Switcher (Image 1 Style: Satellite | Carte | Mixte) */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03]">
+        {/* Right: Map Layer Switcher (Satellite | Carte | Mixte) */}
+        <div className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-2xl bg-[#040711]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
           <button
             onClick={() => setTileMode("satellite")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition ${
               tileMode === "satellite"
-                ? "bg-white/[0.1] text-white font-semibold shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-white text-black font-semibold shadow-sm"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
             Satellite
           </button>
           <button
             onClick={() => setTileMode("carte")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition ${
               tileMode === "carte"
-                ? "bg-white/[0.1] text-white font-semibold shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-white text-black font-semibold shadow-sm"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
             Carte
           </button>
           <button
             onClick={() => setTileMode("mixte")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition ${
               tileMode === "mixte"
-                ? "bg-white/[0.1] text-white font-semibold shadow-sm"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-white text-black font-semibold shadow-sm"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
             Mixte
@@ -272,11 +292,11 @@ export default function CadastralSatelliteMapInner({
         </div>
       </div>
 
-      {/* 2. THE MAP VIEWPORT */}
-      <div className="relative flex-1 w-full overflow-hidden bg-[#060709]">
+      {/* 2. THE FULL-BLEED MAP VIEWPORT */}
+      <div className="w-full h-full absolute inset-0 bg-[#060709]">
         <MapContainer
           center={[centerLat, centerLon]}
-          zoom={18}
+          zoom={19}
           minZoom={4}
           maxZoom={22}
           zoomControl={false}
@@ -389,7 +409,12 @@ export default function CadastralSatelliteMapInner({
             />
           )}
 
-          <MapBoundsController beacons={beacons} fitKey={fitKey} />
+          <MapBoundsController
+            beacons={beacons}
+            fitKey={fitKey}
+            leftOffset={leftOffset}
+            rightOffset={rightOffset}
+          />
           <MapEventTracker
             onCoordsChange={setCursorCoords}
             onZoomChange={setZoom}
@@ -397,34 +422,39 @@ export default function CadastralSatelliteMapInner({
           />
         </MapContainer>
 
-        {/* LEFT FLOATING CONTROLS TOOLBAR (Image 1 Style) */}
-        <div className="absolute top-4 left-4 z-[1000] flex flex-col items-center gap-1 p-1.5 rounded-xl bg-[#090B10]/90 ring-1 ring-white/10 shadow-2xl backdrop-blur-xl">
+        {/* LEFT FLOATING CONTROLS TOOLBAR (Positioned offset from the sidebar dock) */}
+        <div
+          className="absolute top-20 z-[1000] flex flex-col items-center gap-1.5 p-1.5 rounded-2xl bg-[#040711]/85 border border-white/[0.08] shadow-2xl backdrop-blur-xl transition-all duration-300"
+          style={{ left: `${leftOffset + 16}px` }}
+        >
           <button
             onClick={() => mapInstance?.zoomIn()}
             title="Zoom avant"
-            className="p-2 rounded-lg hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
+            className="p-2 rounded-xl hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button
             onClick={() => mapInstance?.zoomOut()}
             title="Zoom arrière"
-            className="p-2 rounded-lg hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
+            className="p-2 rounded-xl hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
             onClick={() => setFitKey((k) => k + 1)}
             title="Recadrer la parcelle"
-            className="p-2 rounded-lg hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
+            className="p-2 rounded-xl hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
           >
             <Crosshair className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowMeasure(!showMeasure)}
             title="Afficher mesure périmétrique"
-            className={`p-2 rounded-lg transition ${
-              showMeasure ? "bg-white/[0.1] text-[#00DF8F]" : "text-zinc-300 hover:text-white hover:bg-white/[0.08]"
+            className={`p-2 rounded-xl transition ${
+              showMeasure
+                ? "bg-white text-black font-semibold shadow-sm"
+                : "text-zinc-300 hover:text-white hover:bg-white/[0.08]"
             }`}
           >
             <Ruler className="w-4 h-4" />
@@ -432,43 +462,49 @@ export default function CadastralSatelliteMapInner({
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
-            className="p-2 rounded-lg hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
+            className="p-2 rounded-xl hover:bg-white/[0.08] text-zinc-300 hover:text-white transition"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
 
-        {/* BOTTOM-LEFT TELEMETRY HUD (Image 1 Style) */}
-        <div className="absolute bottom-4 left-4 z-[1000] flex items-center gap-2 pointer-events-none font-mono text-[11px]">
+        {/* BOTTOM-LEFT TELEMETRY HUD (Offset from the sidebar dock) */}
+        <div
+          className="absolute bottom-4 z-[1000] flex items-center gap-2 pointer-events-none font-mono text-xs transition-all duration-300"
+          style={{ left: `${leftOffset + 16}px` }}
+        >
           {/* Compass */}
-          <div className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#090B10]/90 ring-1 ring-white/10 text-zinc-300 backdrop-blur-xl shadow-xl">
+          <div className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#040711]/85 border border-white/[0.08] text-zinc-200 backdrop-blur-xl shadow-xl">
             <Compass className="w-3.5 h-3.5 text-[#00DF8F]" />
             <span className="font-bold">N 0°</span>
           </div>
 
           {/* GPS Coordinates */}
-          <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#090B10]/90 ring-1 ring-white/10 text-zinc-300 backdrop-blur-xl shadow-xl">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00DF8F]" />
-            <span>{cursorCoords.lat.toFixed(5)}° N</span>
+          <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#040711]/85 border border-white/[0.08] text-zinc-200 backdrop-blur-xl shadow-xl">
+            <span className="w-2 h-2 rounded-full bg-[#00DF8F]" />
+            <span className="font-medium">{cursorCoords.lat.toFixed(5)}° N</span>
             <span className="text-zinc-600">/</span>
-            <span>{cursorCoords.lng.toFixed(5)}° E</span>
+            <span className="font-medium">{cursorCoords.lng.toFixed(5)}° E</span>
           </div>
 
           {/* Scale */}
-          <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#090B10]/90 ring-1 ring-white/10 text-zinc-400 backdrop-blur-xl shadow-xl">
-            <span>{epsgCode}</span>
+          <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#040711]/85 border border-white/[0.08] text-zinc-300 backdrop-blur-xl shadow-xl">
+            <span className="text-[#93C5FD] font-semibold">{epsgCode}</span>
             <span className="text-zinc-600">·</span>
-            <span className="font-bold text-zinc-200">z{zoom}</span>
+            <span className="font-bold text-white">z{zoom}</span>
           </div>
         </div>
 
-        {/* BOTTOM-RIGHT PERIMETER SUMMARY */}
+        {/* BOTTOM-RIGHT PERIMETER SUMMARY (Offset from the floating dossier) */}
         {showMeasure && boundarySegments.length > 0 && (
-          <div className="absolute bottom-4 right-4 z-[1000] pointer-events-auto px-3 py-1.5 rounded-xl bg-[#090B10]/90 ring-1 ring-white/10 text-[11px] font-mono text-zinc-300 backdrop-blur-xl shadow-xl flex items-center gap-2">
-            <span className="text-zinc-500">Périmètre :</span>
+          <div
+            className="absolute bottom-4 z-[1000] pointer-events-auto px-3.5 py-1.5 rounded-xl bg-[#040711]/85 border border-white/[0.08] text-xs font-mono text-zinc-200 backdrop-blur-xl shadow-xl flex items-center gap-2 transition-all duration-300"
+            style={{ right: `${rightOffset + 16}px` }}
+          >
+            <span className="text-zinc-400 font-sans">Périmètre :</span>
             <span className="font-bold text-[#00DF8F]">{totalPerimeter.toFixed(1)} m</span>
             <span className="text-zinc-600">·</span>
-            <span className="text-zinc-400">{beacons.length} bornes</span>
+            <span className="text-zinc-300">{beacons.length} bornes</span>
             {isFraud && discrepancySqm > 0 && (
               <>
                 <span className="text-zinc-600">·</span>

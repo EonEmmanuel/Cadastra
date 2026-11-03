@@ -3,9 +3,10 @@
 import React, { useEffect, useState } from "react";
 import {
   X,
-  Sparkles,
+  ScanText,
   FileText,
   ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
 import { PlanVerificationRequest, BeaconInput, PlanExtractionPreview } from "@/types/cadastre";
 
@@ -126,14 +127,14 @@ export default function AiExtractionReviewModal({
           {/* Header */}
           <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02] shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#00DF8F]/10 ring-1 ring-[#00DF8F]/20 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-[#00DF8F]" />
+              <div className="w-9 h-9 rounded-xl bg-[#60A5FA]/10 ring-1 ring-[#60A5FA]/20 flex items-center justify-center">
+                <ScanText className="w-5 h-5 text-[#60A5FA]" />
               </div>
               <div>
                 <h3 id="ai-review-title" className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-                  Extraction Multimodale Vision AI & Revue Humaine
-                  <span className="px-2 py-0.5 rounded-full bg-[#00DF8F]/15 text-[#00DF8F] text-[10px] font-mono">
-                    Muse Spark · pipeline en direct
+                  Extraction Optique & Revue Humaine
+                  <span className="px-2 py-0.5 rounded-full bg-[#60A5FA]/15 text-[#93C5FD] text-[10px] font-mono">
+                    Audit optique WGS84
                   </span>
                 </h3>
                 <p className="text-xs text-zinc-400">
@@ -294,13 +295,13 @@ export default function AiExtractionReviewModal({
             <div className="lg:col-span-7 space-y-4 flex flex-col justify-between">
               {/* AI Assistant Prompt Box */}
               <div className="p-3.5 rounded-2xl bg-[#00DF8F]/[0.08] ring-1 ring-[#00DF8F]/20 space-y-1.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#00DF8F]">
-                  <Sparkles className="w-4 h-4 shrink-0" />
-                  <span>Validation Assistée par IA (Human-in-the-Loop)</span>
+                <div className="flex items-center gap-2 text-xs font-bold text-[#60A5FA]">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Validation Géodésique & Contrôle Qualité</span>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed font-normal">
-                  Muse Spark (Meta Model API) a extrait{" "}
-                  <span className="text-[#00DF8F] font-semibold">{beacons.length} bornes</span> depuis
+                  Le moteur d&apos;extraction a relevé{" "}
+                  <span className="text-[#93C5FD] font-semibold">{beacons.length} bornes</span> depuis
                   votre document. Vérifiez ou corrigez chaque valeur ci-dessous avant de lancer le
                   calcul géodésique Gauss-Shoelace et l&apos;audit anti-fraude.
                 </p>

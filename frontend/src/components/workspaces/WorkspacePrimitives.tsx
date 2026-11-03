@@ -20,13 +20,13 @@ export function WorkspaceHeader({
   return (
     <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-zinc-500">
+        <span className="font-mono text-xs uppercase tracking-wider text-[#93C5FD]">
           {eyebrow}
         </span>
-        <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-white sm:text-2xl">
+        <h1 className="mt-1.5 text-xl font-bold tracking-tight text-white sm:text-2xl">
           {title}
         </h1>
-        <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-zinc-400">
+        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-zinc-300">
           {description}
         </p>
       </div>
@@ -76,7 +76,7 @@ export function EmptyState({
         </div>
       )}
       {footnote && (
-        <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-600">
+        <p className="mt-6 font-mono text-xs uppercase tracking-wider text-zinc-500">
           {footnote}
         </p>
       )}
@@ -94,20 +94,20 @@ interface StatTileProps {
 export function StatTile({ label, value, detail, tone = "neutral" }: StatTileProps) {
   const toneClass = {
     neutral: "text-white",
-    success: "text-emerald-400",
+    success: "text-[#00DF8F]",
     danger: "text-red-400",
     warning: "text-amber-400",
   }[tone];
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
-      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+    <div className="rounded-xl border border-white/[0.08] bg-[#040711]/70 backdrop-blur-md px-4 py-3.5">
+      <span className="font-mono text-xs uppercase tracking-wider text-zinc-400 font-medium">
         {label}
       </span>
-      <div className={`mt-1.5 font-mono text-xl font-bold tracking-tight ${toneClass}`}>
+      <div className={`mt-1.5 font-mono text-2xl font-bold tracking-tight ${toneClass}`}>
         {value}
       </div>
-      {detail && <p className="mt-0.5 text-[10px] text-zinc-500">{detail}</p>}
+      {detail && <p className="mt-1 text-xs text-zinc-400">{detail}</p>}
     </div>
   );
 }
@@ -122,10 +122,10 @@ export function RowAction({ onClick, label }: RowActionProps) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-[#60A5FA]/40 hover:bg-[#60A5FA]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60A5FA]/40"
     >
       {label}
-      <ArrowUpRight className="h-3 w-3" />
+      <ArrowUpRight className="h-3.5 w-3.5 text-[#60A5FA]" />
     </button>
   );
 }
