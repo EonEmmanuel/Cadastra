@@ -1,6 +1,7 @@
 """Unit tests for SAM segmentation parsing and PDF input routing helpers."""
 
 import io
+import shutil
 
 import pytest
 from reportlab.pdfgen import canvas
@@ -47,6 +48,7 @@ def test_editable_pdf_text_requires_multiple_coordinate_rows():
     assert _has_usable_embedded_coordinate_text("B1 583420 446100") is False
 
 
+@pytest.mark.skipif(not shutil.which("pdftoppm"), reason="pdftoppm not installed on host")
 def test_scanned_pdf_renderer_returns_png_page():
     pdf = io.BytesIO()
     page = canvas.Canvas(pdf)

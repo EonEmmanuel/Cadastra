@@ -25,12 +25,14 @@ export default function ApiSettingsModal({
 }: ApiSettingsModalProps) {
   const [whatsappToken, setWhatsappToken] = useState("");
   const [phoneNumberId, setPhoneNumberId] = useState("");
-  const [verifyToken, setVerifyToken] = useState("cadastra_cameroon_secret_token_2026");
+  const [verifyToken, setVerifyToken] = useState("");
   const [metaLlamaKey, setMetaLlamaKey] = useState("");
   const [webhookUrl, setWebhookUrl] = useState(`${apiBaseUrl}/api/webhook/whatsapp`);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedVerify, setCopiedVerify] = useState(false);
   const [testStatus, setTestStatus] = useState<string | null>(null);
   // Real server-side key status from /api/config (nothing is stored in/required by the browser).
   const [serverStatus, setServerStatus] = useState<{
@@ -43,8 +45,12 @@ export default function ApiSettingsModal({
       .then((res) => res.json())
       .then((data) => {
         if (data.webhook_url) setWebhookUrl(data.webhook_url);
-        if (data.phone_number_id) setPhoneNumberId((prev) => prev || data.phone_number_id);
-        if (data.whatsapp_verify_token) setVerifyToken((prev) => prev || data.whatsapp_verify_token);
+        if (data.phone_number_id) setPhoneNumberId(data.phone_number_id);
+        // The server value is authoritative: the .env / runtime token must be
+        // the one pasted into the Meta App Dashboard, not a UI default.
+        if (typeof data.whatsapp_verify_token === "string") {
+          setVerifyToken(data.whatsapp_verify_token);
+        }
         setServerStatus({
           metaApiKey: !!data.meta_api_key_configured,
           whatsappToken: !!data.whatsapp_token_configured,
@@ -53,59 +59,66 @@ export default function ApiSettingsModal({
       .catch(() => {});
   };
 
-  // Load saved config on mount
+  // Load authoritative server config when the dialog opens. Secrets are never
+  // persisted in localStorage: they are posted to the local backend only.
   useEffect(() => {
     if (!isOpen) return;
-
-    // Load from localStorage first
-    const savedToken = localStorage.getItem("cadastra_whatsapp_token") || "";
-    const savedPhoneId = localStorage.getItem("cadastra_phone_number_id") || "";
-    const savedVerifyToken = localStorage.getItem("cadastra_verify_token") || "cadastra_cameroon_secret_token_2026";
-    const savedLlamaKey = localStorage.getItem("cadastra_llama_key") || "";
-
-    if (savedToken) setWhatsappToken(savedToken);
-    if (savedPhoneId) setPhoneNumberId(savedPhoneId);
-    if (savedVerifyToken) setVerifyToken(savedVerifyToken);
-    if (savedLlamaKey) setMetaLlamaKey(savedLlamaKey);
-
     refreshConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, apiBaseUrl]);
+
+  // Close on Escape.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const handleSave = async () => {
     setIsSaving(true);
     setSaveSuccess(false);
+    setSaveError(null);
 
-    // Save to localStorage
-    localStorage.setItem("cadastra_whatsapp_token", whatsappToken);
-    localStorage.setItem("cadastra_phone_number_id", phoneNumberId);
-    localStorage.setItem("cadastra_verify_token", verifyToken);
-    localStorage.setItem("cadastra_llama_key", metaLlamaKey);
+    // Send only fields the operator actually filled; an empty value must not
+    // overwrite a working server-side credential.
+    const payload: Record<string, string> = {};
+    if (whatsappToken.trim()) payload.whatsapp_token = whatsappToken.trim();
+    if (phoneNumberId.trim()) payload.phone_number_id = phoneNumberId.trim();
+    if (verifyToken.trim()) payload.whatsapp_verify_token = verifyToken.trim();
+    if (metaLlamaKey.trim()) payload.meta_api_key = metaLlamaKey.trim();
+    if (webhookUrl.trim()) payload.webhook_url = webhookUrl.trim();
 
-    // Sync with backend API
+    if (Object.keys(payload).length === 0) {
+      setSaveError("Renseignez au moins un champ avant d'enregistrer.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          whatsapp_token: whatsappToken,
-          phone_number_id: phoneNumberId,
-          whatsapp_verify_token: verifyToken,
-          meta_llama_key: metaLlamaKey,
-          webhook_url: webhookUrl,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 2500);
-        refreshConfig();
+      if (!res.ok) {
+        throw new Error(`Le serveur a répondu ${res.status}.`);
       }
-    } catch (e) {
-      console.warn("Could not sync with backend config endpoint", e);
+
       setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+      refreshConfig();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? `Configuration non enregistrée — ${error.message}`
+          : "Configuration non enregistrée : backend injoignable."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -132,12 +145,30 @@ export default function ApiSettingsModal({
     setTimeout(() => setCopiedUrl(false), 2000);
   };
 
+  const handleCopyVerify = () => {
+    if (!verifyToken) return;
+    navigator.clipboard.writeText(verifyToken);
+    setCopiedVerify(true);
+    setTimeout(() => setCopiedVerify(false), 2000);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       {/* Outer Shell */}
-      <div className="w-full max-w-xl p-2 rounded-3xl bg-white/[0.02] ring-1 ring-white/[0.08] shadow-2xl font-sans">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="api-settings-title"
+        className="w-full max-w-xl p-2 rounded-3xl bg-white/[0.02] ring-1 ring-white/[0.08] shadow-2xl font-sans"
+      >
         {/* Inner Surface */}
-        <div className="rounded-2xl bg-[#090A0E] p-6 space-y-5 max-h-[85vh] overflow-y-auto">
+        <div data-lenis-prevent className="rounded-2xl bg-[#090A0E] p-6 space-y-5 max-h-[85vh] overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between pb-2">
             <div className="flex items-center gap-2.5">
@@ -145,7 +176,7 @@ export default function ApiSettingsModal({
                 <Key className="w-4 h-4 text-[#00DF8F]" />
               </div>
               <div>
-                <h3 className="text-sm font-display font-bold text-white tracking-tight">
+                <h3 id="api-settings-title" className="text-sm font-display font-bold text-white tracking-tight">
                   Configuration Clés API & Webhook
                 </h3>
                 <p className="text-xs text-zinc-400">
@@ -211,16 +242,41 @@ export default function ApiSettingsModal({
 
             {/* Webhook Verify Token */}
             <div className="space-y-1.5 p-4 rounded-2xl bg-white/[0.02]">
-              <label className="text-xs font-medium text-zinc-300">
-                Jeton de Vérification Webhook (`hub.verify_token`)
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-medium text-zinc-300">
+                  Jeton de Vérification Webhook (<code className="font-mono">hub.verify_token</code>)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCopyVerify}
+                  disabled={!verifyToken}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/[0.1] bg-white/[0.04] px-2 py-1 text-[10px] font-medium text-zinc-300 transition hover:bg-white/[0.08] disabled:opacity-40"
+                >
+                  {copiedVerify ? (
+                    <>
+                      <Check className="h-3 w-3 text-[#00DF8F]" />
+                      Copié
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Copier
+                    </>
+                  )}
+                </button>
+              </div>
               <input
                 type="text"
                 value={verifyToken}
                 onChange={(e) => setVerifyToken(e.target.value)}
-                placeholder="cadastra_cameroon_secret_token_2026"
+                placeholder="Valeur chargée depuis backend/.env (WHATSAPP_VERIFY_TOKEN)"
                 className="w-full bg-white/[0.03] ring-1 ring-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:ring-[#00DF8F]/50 transition"
               />
+              <p className="text-[10px] text-zinc-500">
+                Doit être identique à la valeur saisie dans Meta App Dashboard ›
+                WhatsApp › Configuration › Webhook. Le serveur charge cette
+                valeur depuis <code className="font-mono">backend/.env</code>.
+              </p>
             </div>
 
             {/* WhatsApp Permanent Access Token */}
@@ -236,7 +292,7 @@ export default function ApiSettingsModal({
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full bg-white/[0.06] text-zinc-400 border border-white/[0.1]">
-                      Serveur : simulation locale
+                      Serveur : absente
                     </span>
                   )}
                 </span>
@@ -302,9 +358,17 @@ export default function ApiSettingsModal({
                 className="w-full bg-white/[0.03] ring-1 ring-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:ring-sky-400/50 transition"
               />
               <p className="text-[10px] text-zinc-500">
-                Ce champ est optionnel : en production la clé est lue dans <code>backend/.env</code> ou les variables d'environnement du serveur et n'est jamais stockée dans le navigateur.
+                Ce champ est optionnel : en production la clé est lue dans <code>backend/.env</code> ou les variables d&apos;environnement du serveur et n&apos;est jamais stockée dans le navigateur.
               </p>
             </div>
+
+            {/* Save feedback */}
+            {saveError && (
+              <div className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/[0.08] px-3.5 py-2.5 text-xs text-red-300">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{saveError}</span>
+              </div>
+            )}
 
             {/* Test Status info */}
             {testStatus && (

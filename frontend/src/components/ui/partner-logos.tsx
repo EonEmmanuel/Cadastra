@@ -5,6 +5,11 @@ import React from "react";
 export function PartnerLogos() {
   return (
     <section className="w-full border-y border-white/[0.08] bg-[#07080A]">
+      <div className="border-b border-white/[0.06] px-4 py-2.5 text-center">
+        <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-zinc-600">
+          Technologies et référentiels utilisés · aucune affiliation officielle
+        </span>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] text-center">
         {/* 1. MINDCAF */}
         <div className="py-6 px-4 flex items-center justify-center gap-2.5 text-zinc-400 hover:text-white transition group cursor-default">

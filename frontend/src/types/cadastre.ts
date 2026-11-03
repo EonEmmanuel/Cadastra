@@ -99,6 +99,21 @@ export interface PlanExtractionResponse {
   notes: string | null;
 }
 
+export type VerificationSource = "upload" | "manual" | "dataset";
+
+/**
+ * One completed verification held in the session workspace. The dashboard,
+ * investigations, reports and intelligence panes all read from this single
+ * list so the UI never has to invent a case that does not exist.
+ */
+export interface VerificationRecord {
+  id: string;
+  request: PlanVerificationRequest;
+  result: PlanVerificationResponse;
+  timestamp: string;
+  source: VerificationSource;
+}
+
 // Real provenance of a live extraction, passed from the hero to the review
 // modal so it can render the actual uploaded document with the actual
 // Muse Spark grounding box (never simulated).

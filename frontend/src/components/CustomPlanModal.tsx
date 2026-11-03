@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   Plus,
   Trash2,
   Compass,
   FileSpreadsheet,
+  Wand2,
 } from "lucide-react";
 import { BeaconInput, PlanVerificationRequest } from "@/types/cadastre";
 
@@ -16,6 +17,24 @@ interface CustomPlanModalProps {
   onSubmit: (plan: PlanVerificationRequest) => void;
 }
 
+// Ground-truth parcel from test_data/douala_yassa_utm32n.json. Loading it is a
+// real reference fill, not a simulated audit.
+const DOUALA_YASSA_EXAMPLE = {
+  planId: "DLA-YAS-2024-001",
+  titleNumber: "TF 48291/Wouri",
+  ownerName: "Tchamba Ndongo Jean-Pierre",
+  locality: "Douala - Yassa (Zone Résidentielle)",
+  region: "Littoral",
+  division: "Wouri",
+  statedArea: 980,
+  beacons: [
+    { borne_id: "B1", x: 583420, y: 446100, z: 24.5, description: "Borne béton d'angle Nord-Ouest" },
+    { borne_id: "B2", x: 583455, y: 446100, z: 24.8, description: "Borne béton d'angle Nord-Est" },
+    { borne_id: "B3", x: 583455, y: 446072, z: 25.1, description: "Borne béton d'angle Sud-Est" },
+    { borne_id: "B4", x: 583420, y: 446072, z: 24.9, description: "Borne béton d'angle Sud-Ouest" },
+  ],
+};
+
 export default function CustomPlanModal({
   isOpen,
   onClose,
@@ -23,11 +42,13 @@ export default function CustomPlanModal({
 }: CustomPlanModalProps) {
   const [planId, setPlanId] = useState("");
   const [titleNumber, setTitleNumber] = useState("");
+  const [ownerName, setOwnerName] = useState("");
   const [locality, setLocality] = useState("");
   const [region, setRegion] = useState("Littoral");
   const [division, setDivision] = useState("");
   const [utmZone, setUtmZone] = useState<"32N" | "33N">("32N");
   const [statedArea, setStatedArea] = useState<number | "">("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [beacons, setBeacons] = useState<BeaconInput[]>([
     { borne_id: "B1", x: "" as any, y: "" as any, z: 0, description: "Borne B1" },
@@ -36,7 +57,30 @@ export default function CustomPlanModal({
     { borne_id: "B4", x: "" as any, y: "" as any, z: 0, description: "Borne B4" },
   ]);
 
+  // Close on Escape, matching the other dialogs and avoiding a keyboard trap.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
+  const fillExample = () => {
+    setPlanId(DOUALA_YASSA_EXAMPLE.planId);
+    setTitleNumber(DOUALA_YASSA_EXAMPLE.titleNumber);
+    setOwnerName(DOUALA_YASSA_EXAMPLE.ownerName);
+    setLocality(DOUALA_YASSA_EXAMPLE.locality);
+    setRegion(DOUALA_YASSA_EXAMPLE.region);
+    setDivision(DOUALA_YASSA_EXAMPLE.division);
+    setStatedArea(DOUALA_YASSA_EXAMPLE.statedArea);
+    setUtmZone("32N");
+    setBeacons(DOUALA_YASSA_EXAMPLE.beacons.map((beacon) => ({ ...beacon })));
+    setFormError(null);
+  };
 
   const handleAddBeacon = () => {
     const nextNum = beacons.length + 1;
@@ -50,11 +94,12 @@ export default function CustomPlanModal({
         description: `Borne B${nextNum}`,
       },
     ]);
+    setFormError(null);
   };
 
   const handleRemoveBeacon = (index: number) => {
     if (beacons.length <= 3) {
-      alert("Un polygone cadastral valide requiert au minimum 3 sommets (bornes).");
+      setFormError("Un polygone cadastral valide requiert au minimum 3 bornes.");
       return;
     }
     setBeacons(beacons.filter((_, i) => i !== index));
@@ -78,14 +123,19 @@ export default function CustomPlanModal({
     }));
 
     if (validBeacons.some((b) => b.x === 0 || b.y === 0)) {
-      alert("Veuillez renseigner les coordonnées X et Y pour toutes les bornes.");
+      setFormError("Renseignez les coordonnées X et Y de chaque borne avant de lancer l'audit.");
+      return;
+    }
+
+    if (!statedArea || Number(statedArea) <= 0) {
+      setFormError("La superficie déclarée doit être supérieure à 0 m².");
       return;
     }
 
     const req: PlanVerificationRequest = {
       plan_id: planId.trim() || `PLAN-${Date.now().toString().slice(-6)}`,
       title_number: titleNumber.trim() || undefined,
-      owner_name: "Propriétaire Déclarant",
+      owner_name: ownerName.trim() || "Propriétaire déclarant",
       locality: locality.trim() || "Cameroun",
       region: region.trim() || "Littoral",
       division: division.trim() || undefined,
@@ -99,8 +149,19 @@ export default function CustomPlanModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md font-sans">
-      <div className="w-full max-w-2xl bg-[#090B10] rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/[0.08] max-h-[90vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md font-sans"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="custom-plan-title"
+        className="w-full max-w-2xl bg-[#090B10] rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/[0.08] max-h-[90vh] flex flex-col"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-white/[0.02] border-b border-white/[0.06] shrink-0">
           <div className="flex items-center gap-3">
@@ -108,25 +169,38 @@ export default function CustomPlanModal({
               <Compass className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white tracking-tight">
+              <h3 id="custom-plan-title" className="text-sm font-bold text-white tracking-tight">
                 Saisie Manuelle des Coordonnées Géodésiques
               </h3>
               <p className="text-xs text-zinc-400">
-                Normes Décret N° 76-165 · Projection UTM Snyder
+                Système Géodésique WGS84 · Projection UTM Snyder
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={fillExample}
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+              title="Remplir avec une parcelle réelle de test_data"
+            >
+              <Wand2 className="w-3 h-3" />
+              Exemple Douala
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fermer"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+        <form data-lenis-prevent onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
@@ -150,6 +224,19 @@ export default function CustomPlanModal({
                 value={titleNumber}
                 onChange={(e) => setTitleNumber(e.target.value)}
                 placeholder="ex: TF 12345/Wouri"
+                className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">
+                Propriétaire déclarant
+              </label>
+              <input
+                type="text"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="ex: Tchamba Ndongo Jean-Pierre"
                 className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/30"
               />
             </div>
@@ -256,7 +343,7 @@ export default function CustomPlanModal({
                       step="0.01"
                       value={b.x}
                       onChange={(e) => handleUpdateBeacon(i, "x", e.target.value)}
-                      placeholder="X (Esting)"
+                      placeholder="X (Easting)"
                       className="w-full px-2 py-1 rounded bg-black/40 border border-white/[0.08] text-zinc-200 text-xs focus:outline-none"
                     />
                   </div>
@@ -286,6 +373,13 @@ export default function CustomPlanModal({
               ))}
             </div>
           </div>
+
+          {/* Inline validation: no browser alert(), no silent failure */}
+          {formError && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] px-3.5 py-2.5 text-xs text-red-300">
+              {formError}
+            </div>
+          )}
 
           {/* Submit */}
           <div className="pt-4 flex items-center justify-end gap-3 border-t border-white/[0.06]">

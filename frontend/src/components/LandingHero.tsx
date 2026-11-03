@@ -1,25 +1,25 @@
 "use client";
 
-import React, { useState, useRef, DragEvent, KeyboardEvent } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  DragEvent,
+  KeyboardEvent,
+} from "react";
 import {
-  UploadCloud,
   FileText,
-  Play,
-  Sparkles,
   ArrowUp,
-  Paperclip,
   Image as ImageIcon,
-  Mic,
+  MessageCircle,
   X,
-  FileEdit,
+  Compass,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { gsap } from "gsap";
 import { PlanVerificationRequest, PlanExtractionPreview } from "@/types/cadastre";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { HalftoneDome } from "@/components/ui/halftone-dome";
-import { WaveformVisualizer } from "@/components/ui/waveform-visualizer";
-import { PartnerLogos } from "@/components/ui/partner-logos";
 
 interface LandingHeroProps {
   onPlanLoaded: (
@@ -44,20 +44,122 @@ export default function LandingHero({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extractError, setExtractError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 1: attach the file to the composer (no auto-fire — the user presses send).
-  const handleAttachFile = (file: File) => {
-    setAttachedFile(file);
-    setExtractError(null);
-  };
+  // Dedicated refs for Image and PDF inputs
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 2: send → run the real Muse Spark extraction on the attached file.
+  // GSAP animation refs
+  const containerRef = useRef<HTMLDivElement>(null);
+  const bloomRef = useRef<HTMLDivElement>(null);
+  const wave1Ref = useRef<SVGPathElement>(null);
+  const wave2Ref = useRef<SVGPathElement>(null);
+  const wave3Ref = useRef<SVGPathElement>(null);
+
+  // Create / revoke object URL whenever attached file changes
+  useEffect(() => {
+    if (!attachedFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    if (attachedFile.type.startsWith("image/")) {
+      const url = URL.createObjectURL(attachedFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    // PDF — no image preview
+    setPreviewUrl(null);
+  }, [attachedFile]);
+
+  // GSAP entrance + ambient animations
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.from(".hero-anim-header", {
+        y: -16,
+        opacity: 0,
+        duration: 0.55,
+        ease: "power2.out",
+      });
+      gsap.from(".hero-anim-title", {
+        y: 20,
+        opacity: 0,
+        duration: 0.65,
+        ease: "power3.out",
+        delay: 0.05,
+      });
+      gsap.from(".hero-anim-subtitle", {
+        y: 16,
+        opacity: 0,
+        duration: 0.65,
+        ease: "power2.out",
+        delay: 0.1,
+      });
+      // The card keeps opacity 100% solid at all times (never dims on refresh/mount)
+      gsap.from(".hero-anim-card", {
+        y: 18,
+        duration: 0.6,
+        ease: "power2.out",
+      });
+      gsap.from([".hero-anim-trust", ".hero-anim-samples"], {
+        y: 14,
+        opacity: 0,
+        duration: 0.6,
+        stagger: 0.08,
+        ease: "power2.out",
+        delay: 0.18,
+      });
+
+      if (wave1Ref.current) {
+        gsap.to(wave1Ref.current, {
+          y: -12,
+          duration: 4.8,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut",
+        });
+      }
+      if (wave2Ref.current) {
+        gsap.to(wave2Ref.current, {
+          y: 10,
+          duration: 6.2,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut",
+          delay: 0.5,
+        });
+      }
+      if (wave3Ref.current) {
+        gsap.to(wave3Ref.current, {
+          y: -8,
+          duration: 5.4,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut",
+          delay: 1.0,
+        });
+      }
+      if (bloomRef.current) {
+        gsap.to(bloomRef.current, {
+          scale: 1.06,
+          opacity: 0.9,
+          duration: 5.5,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut",
+        });
+      }
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, []);
+
+  // Core extraction pipeline — called only when user presses submit
   const handleFileUpload = async (file: File) => {
     setIsProcessing(true);
-    setAttachedFile(file);
     setExtractError(null);
+
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -70,8 +172,6 @@ export default function LandingHero({
       if (res.ok) {
         const data = await res.json();
         if (data?.extracted_plan) {
-          // Real extraction provenance: the actual file preview plus the actual
-          // Muse Spark grounding box — never simulated.
           const structured = data.spark_structured_fields ?? {};
           const preview: PlanExtractionPreview = {
             previewUrl: URL.createObjectURL(file),
@@ -79,15 +179,21 @@ export default function LandingHero({
             tableRoi: data.table_roi ?? null,
             samTableRoi: data.sam_table_roi ?? null,
             cropUrl:
-              typeof data.table_crop_data_url === "string" ? data.table_crop_data_url : null,
+              typeof data.table_crop_data_url === "string"
+                ? data.table_crop_data_url
+                : null,
             samSegmentation:
               typeof structured.sam_3_1?.table_refinement === "string"
                 ? structured.sam_3_1.table_refinement
                 : null,
             documentSource:
-              typeof structured.document_source === "string" ? structured.document_source : null,
+              typeof structured.document_source === "string"
+                ? structured.document_source
+                : null,
             zoomRecheck:
-              typeof structured.zoom_recheck === "string" ? structured.zoom_recheck : null,
+              typeof structured.zoom_recheck === "string"
+                ? structured.zoom_recheck
+                : null,
             protocol: structured.protocol ?? null,
             detectedLanguage: data.detected_language ?? null,
           };
@@ -95,507 +201,611 @@ export default function LandingHero({
           setAttachedFile(null);
           return;
         }
-        setExtractError("Le serveur n'a renvoyé aucune donnée exploitable pour ce fichier.");
+        setExtractError(
+          "Le serveur n'a renvoyé aucune coordonnée exploitable pour ce document."
+        );
         return;
       }
 
-      // Surface the real backend reason — never silently dump the user
-      // into the manual-entry modal on failure.
       let detail = `Erreur serveur ${res.status}`;
       try {
         const err = await res.json();
         if (err?.detail) {
-          detail = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+          if (typeof err.detail === "string") {
+            if (
+              err.detail.includes("PlanVerificationRequest") ||
+              err.detail.includes("beacons")
+            ) {
+              detail =
+                "Aucune table de bornes (B1...Bn) lisible n'a été trouvée sur cette image. Assurez-vous d'utiliser un plan de bornage avec son tableau de coordonnées géodésiques.";
+            } else {
+              detail = err.detail;
+            }
+          } else {
+            detail = JSON.stringify(err.detail);
+          }
         }
       } catch {
-        // Response body was not JSON — keep the status-code detail.
+        // fall through to status-code message
       }
-      setExtractError(`Extraction IA impossible — ${detail}`);
+      setExtractError(`Extraction IA : ${detail}`);
     } catch {
       setExtractError(
-        "Impossible de joindre le serveur d'analyse (http://localhost:8000). Vérifiez que le backend est démarré puis réessayez."
+        "Impossible de contacter le serveur backend (http://localhost:8000). Vérifiez que FastAPI est démarré."
       );
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // File selection handlers — attach only, no auto-upload
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const isImage =
+      file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(file.name);
+    if (!isImage) {
+      setExtractError(
+        "Format invalide. Ce sélecteur n'accepte que les images (PNG, JPG, WEBP)."
+      );
+      return;
+    }
+    setExtractError(null);
+    setAttachedFile(file);
+  };
+
+  const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const isPdf =
+      file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (!isPdf) {
+      setExtractError(
+        "Format invalide. Ce sélecteur n'accepte que les documents PDF."
+      );
+      return;
+    }
+    setExtractError(null);
+    setAttachedFile(file);
+  };
+
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
   };
 
   const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleAttachFile(e.dataTransfer.files[0]);
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    const isImage =
+      file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(file.name);
+    const isPdf =
+      file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+
+    if (!isImage && !isPdf) {
+      setExtractError(
+        "Format non pris en charge. Déposez une image (PNG, JPG) ou un PDF."
+      );
+      return;
     }
+    setExtractError(null);
+    setAttachedFile(file);
   };
 
+  // Submit: if file is attached, upload it; otherwise handle text intent
   const handlePromptSubmit = () => {
-    if (isProcessing) return;
-
     if (attachedFile) {
       handleFileUpload(attachedFile);
       return;
     }
 
-    if (!promptText.trim()) {
-      fileInputRef.current?.click();
+    const trimmed = promptText.trim().toLowerCase();
+    if (!trimmed) {
+      imageInputRef.current?.click();
       return;
     }
 
-    // If user typed coordinates or text, open manual modal
+    if (
+      trimmed.includes("yassa") ||
+      (trimmed.includes("douala") && !trimmed.includes("fraude"))
+    ) {
+      handleLoadSample("douala_yassa_utm32n.json");
+      return;
+    }
+    if (
+      trimmed.includes("fraude") ||
+      trimmed.includes("fraud") ||
+      trimmed.includes("fictive")
+    ) {
+      handleLoadSample("douala_yassa_fraud_superficie.json");
+      return;
+    }
+    if (
+      trimmed.includes("odza") ||
+      trimmed.includes("yaounde") ||
+      trimmed.includes("yaoundé")
+    ) {
+      handleLoadSample("yaounde_odza_utm32n.json");
+      return;
+    }
+
     onOpenManualModal();
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handlePromptSubmit();
     }
   };
 
+  const handleLoadSample = async (profileName: string) => {
+    setIsProcessing(true);
+    setExtractError(null);
+    try {
+      const res = await fetch(
+        `http://localhost:8000/api/profiles/${profileName}`
+      );
+      if (res.ok) {
+        const plan = await res.json();
+        onPlanLoaded(plan, profileName, null);
+      } else {
+        setExtractError("Profil de démonstration introuvable sur le serveur.");
+      }
+    } catch {
+      setExtractError("Erreur de connexion lors du chargement du profil.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
-    // Outer Framed Artboard (Vocel Framed Layout: hairline borders + pitch-black bg)
-    <div className="w-full max-w-[1240px] mx-auto border-x border-white/[0.08] min-h-screen bg-[#07080A] text-zinc-100 flex flex-col justify-between select-none relative font-sans">
-      {/* Geodetic Corner Registration Crosshairs (+) */}
-      <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 text-white/30 text-xs font-mono pointer-events-none z-30">
-        +
-      </div>
-      <div className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 text-white/30 text-xs font-mono pointer-events-none z-30">
-        +
+    <div
+      ref={containerRef}
+      className="relative w-full min-h-screen bg-[#03060E] text-zinc-100 flex flex-col justify-between overflow-x-clip font-sans select-none"
+    >
+      {/* Atmospheric ambient layers */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <div
+          className="absolute -top-[12%] left-[8%] w-[620px] h-[520px] rounded-full opacity-25 blur-[130px]"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(129, 140, 248, 0.4) 0%, transparent 70%)",
+          }}
+        />
+        <div
+          ref={bloomRef}
+          className="absolute top-[32%] left-1/2 -translate-x-1/2 w-[1150px] h-[780px] rounded-full pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 70% 55% at 50% 50%, rgba(37, 99, 235, 0.44) 0%, rgba(29, 78, 216, 0.22) 42%, rgba(15, 23, 42, 0) 75%)",
+          }}
+        />
+        <div
+          className="absolute bottom-0 inset-x-0 h-[480px] w-full"
+          style={{
+            background:
+              "radial-gradient(ellipse 100% 65% at 50% 100%, rgba(59, 130, 246, 0.38) 0%, rgba(30, 64, 175, 0.18) 45%, transparent 75%)",
+          }}
+        />
+        <div className="absolute bottom-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-[#93C5FD]/50 to-transparent" />
+
+        <svg
+          viewBox="0 0 1440 320"
+          className="absolute bottom-0 inset-x-0 w-full h-[270px] object-cover opacity-45 text-[#93C5FD]"
+          preserveAspectRatio="none"
+          fill="none"
+        >
+          <path
+            ref={wave1Ref}
+            d="M0,210 C260,130 520,260 760,190 C1000,120 1220,230 1440,170"
+            stroke="currentColor"
+            strokeWidth="1.2"
+          />
+          <path
+            ref={wave2Ref}
+            d="M0,240 C300,190 600,270 880,215 C1140,165 1320,245 1440,205"
+            stroke="currentColor"
+            strokeWidth="0.8"
+            opacity="0.65"
+          />
+          <path
+            ref={wave3Ref}
+            d="M0,265 C340,225 660,285 980,245 C1260,205 1360,255 1440,235"
+            stroke="currentColor"
+            strokeWidth="0.6"
+            opacity="0.45"
+          />
+        </svg>
       </div>
 
-      {/* 1. TOP NAVIGATION BAR */}
-      <header className="w-full border-b border-white/[0.08] px-6 py-4 flex items-center justify-between gap-4">
-        {/* Left: Geometric Cadastral Glyph + Logo */}
+      {/* Minimalist Header */}
+      <header className="hero-anim-header relative z-20 w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 text-white">
-              <path
-                d="M12 2L2 7L12 12L22 7L12 2Z"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M2 17L12 22L22 17"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M2 12L12 17L22 12"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+          <div className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center bg-white/[0.04] backdrop-blur-md">
+            <div className="w-4 h-4 rounded-full border border-[#60A5FA]/70 flex items-center justify-center">
+              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+            </div>
           </div>
-          <span className="text-xs font-semibold tracking-wider text-white uppercase">
-            CADASTRA<span className="text-zinc-500 font-mono ml-1">CM</span>
+          <span className="text-sm font-semibold tracking-tight text-white uppercase font-sans">
+            CADASTRA<span className="text-[#60A5FA] ml-1 font-mono text-xs">CM</span>
           </span>
         </div>
 
-        {/* Center: Clean Nav Links */}
-        <nav className="hidden md:flex items-center gap-7 text-xs text-zinc-400 font-normal">
-          <a href="#audit" className="hover:text-white transition">
-            Cadastre
-          </a>
-          <a href="#vision" className="hover:text-white transition">
-            Vision AI
-          </a>
-          <a href="#geodesy" className="hover:text-white transition">
-            Géodésie
-          </a>
-          <button onClick={onOpenWhatsAppModal} className="hover:text-white transition">
+        <nav className="hidden md:flex items-center gap-8 text-xs font-normal text-zinc-400">
+          <button
+            type="button"
+            onClick={onOpenManualModal}
+            className="hover:text-white transition-colors"
+          >
+            Géodésie UTM
+          </button>
+          <button
+            type="button"
+            onClick={() => handleLoadSample("douala_yassa_utm32n.json")}
+            className="hover:text-white transition-colors"
+          >
+            Plan de bornage
+          </button>
+          <button
+            type="button"
+            onClick={onOpenWhatsAppModal}
+            className="hover:text-white transition-colors"
+          >
             WhatsApp API
           </button>
-          <a href="#standards" className="hover:text-white transition">
-            MINDCAF
-          </a>
+          <button
+            type="button"
+            onClick={onOpenApiSettings}
+            className="hover:text-white transition-colors"
+          >
+            Muse Spark
+          </button>
         </nav>
 
-        {/* Right: Actions + Solid White Button */}
-        <div className="flex items-center gap-3 text-xs">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onOpenWhatsAppModal}
-            className="hidden sm:inline-flex text-zinc-400 hover:text-white"
-          >
-            WhatsApp
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
             onClick={onOpenApiSettings}
-            className="text-zinc-400 hover:text-white"
+            className="hidden sm:inline-flex text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-full transition"
           >
             Clés API
-          </Button>
-
-          <Button
-            variant="primary"
-            size="sm"
+          </button>
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            type="button"
             onClick={onOpenDashboard}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/[0.12] backdrop-blur-md transition-all active:scale-95"
           >
-            Ouvrir la Carte
-          </Button>
+            <span>Ouvrir la Carte</span>
+          </motion.button>
         </div>
       </header>
 
-      {/* 2. HERO SECTION */}
-      <section className="relative w-full pt-16 pb-8 px-6 flex flex-col items-center text-center">
-        {/* Eyebrow Pill Badge (Vocel Pattern) */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] text-zinc-300 mb-8 cursor-default">
-          <span className="w-1.5 h-1.5 rounded-full bg-white" />
-          <span className="font-mono uppercase tracking-wider text-zinc-300 font-medium">
-            HACKATHON META AI 2026 : NORMES DÉCRET 76-165
-          </span>
-          <span className="text-zinc-500 font-mono">›</span>
-        </div>
-
-        {/* Big Bold Headline (Balanced 2-Line Typography without orphans) */}
-        <h1 className="text-3xl sm:text-5xl lg:text-[56px] font-medium tracking-tight text-white max-w-5xl leading-[1.14]">
-          L&apos;Intelligence Cadastrale qui&nbsp;s&apos;exécute
-          <br />
-          à la vitesse de la pensée
+      {/* Hero content */}
+      <main className="relative z-10 w-full max-w-4xl mx-auto px-6 pt-10 pb-16 flex flex-col items-center text-center my-auto">
+        <h1 className="hero-anim-title text-4xl sm:text-[3.6rem] font-bold tracking-[-0.03em] text-white leading-[1.1] max-w-3xl">
+          Audit Foncier &amp; Vérification Cadastrale
         </h1>
-
-        {/* Subtitle */}
-        <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mt-5 leading-relaxed font-normal">
-          Audit géodésique autonome, extraction structurée des bornes par Muse Spark (Meta Model API), projection de Snyder et détection instantanée des fraudes foncières au Cameroun. Optimisé pour les géomètres qui bâtissent l&apos;avenir.
+        <p className="hero-anim-subtitle mt-4 text-sm text-zinc-400 max-w-lg mx-auto leading-relaxed font-normal">
+          Moteur géodésique autonome pour la vérification de plans de bornage et
+          la détection de superficies fictives au Cameroun.
         </p>
 
-        {/* Two Real Action Buttons (No dummy demo triggers) */}
-        <div className="flex items-center gap-3 mt-6 mb-4">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <UploadCloud className="w-4 h-4 mr-2" />
-            Auditer un plan (Image / PDF)
-          </Button>
+        {/* Hidden file inputs */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/webp"
+          className="hidden"
+          onChange={handleImageSelect}
+        />
+        <input
+          ref={pdfInputRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={handlePdfSelect}
+        />
 
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={onOpenManualModal}
-          >
-            <FileEdit className="w-4 h-4 mr-2" />
-            Saisie manuelle des coordonnées
-          </Button>
-        </div>
-
-        {/* 3. HERO STAGE: BACKGROUND DOME + LARGE DECORATED AI INPUT DIRECTLY UNDER */}
-        <div className="relative w-full max-w-4xl mt-3 pb-24 flex flex-col items-center">
-          {/* Halftone Dome as backdrop: lifted up so its curved stipple crown arches above the card */}
-          <div className="absolute -top-14 inset-x-0 flex justify-center pointer-events-none z-0">
-            <HalftoneDome />
-          </div>
-
-          {/* 4. LARGE, DECORATED AI MODE INPUT FIELD (Directly Under, Sized & Decorated) */}
-          <div
-            id="audit"
-            className="relative z-10 w-full max-w-3xl mx-auto mt-4 text-left space-y-3.5"
-          >
-            {/* Multi-Color Ambient Glow Ring + Rainbow Gradient Frame */}
-            <div className="relative group w-full">
-              {/* Outer Rainbow Multi-Color Atmospheric Glow Halo */}
-              <div className="absolute -inset-1 sm:-inset-1.5 rounded-[34px] bg-gradient-to-r from-sky-400 via-teal-300 via-emerald-400 via-amber-300 via-orange-400 via-rose-500 to-indigo-500 blur-xl opacity-75 group-hover:opacity-95 transition duration-500 pointer-events-none" />
-              <div className="absolute -inset-0.5 rounded-[32px] bg-gradient-to-r from-sky-400 via-teal-300 via-emerald-400 via-amber-300 via-orange-400 via-rose-500 to-indigo-500 blur-sm opacity-90 pointer-events-none" />
-
-              {/* The Input Card Container with 1.5px Rainbow Frame */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`relative rounded-[32px] p-[1.5px] bg-gradient-to-r from-sky-400 via-teal-300 via-emerald-400 via-amber-300 via-orange-400 via-rose-500 to-indigo-500 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.9)] transition-all duration-300 ${
-                  isDragging ? "scale-[1.01]" : ""
-                }`}
+        {/* THE FLOATING AI INPUT CARD — Pure Snow White Solid Surface */}
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          style={{
+            backgroundColor: isDragging ? "#F8FAFC" : "#FFFFFF",
+            border: isDragging ? "2px solid #3B82F6" : "1px solid rgba(226, 232, 240, 0.9)",
+            boxShadow:
+              "0 24px 60px -12px rgba(0, 0, 0, 0.5), 0 12px 30px -10px rgba(37, 99, 235, 0.25), inset 0 1px 0 rgba(255, 255, 255, 1)",
+          }}
+          className="hero-anim-card relative w-full mt-10 rounded-[32px] p-6 sm:p-7 text-left overflow-hidden z-20"
+        >
+          {/* Attached file indicator chip */}
+          <AnimatePresence>
+            {attachedFile && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="mb-3.5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-zinc-700 text-xs font-medium text-zinc-100 shadow-sm"
               >
-                {/* Inner Card Glass Surface */}
-                <div className="relative rounded-[30.5px] bg-[#0A0D14]/95 backdrop-blur-2xl p-6 sm:p-7 flex flex-col justify-between min-h-[165px] sm:min-h-[185px]">
-                  {/* Subtle inner rainbow wash along the bottom edge */}
-                  <div className="absolute inset-x-0 bottom-0 h-16 rounded-b-[30px] bg-gradient-to-t from-white/[0.03] to-transparent pointer-events-none" />
-                  <div className="absolute inset-x-12 bottom-0 h-[2px] bg-gradient-to-r from-sky-400/30 via-amber-300/40 via-orange-400/40 to-indigo-500/30 blur-[1px] pointer-events-none" />
-
-                  {/* Top: Text Input / Query */}
-                  <div className="w-full flex-1">
-                    <textarea
-                      rows={2}
-                      value={promptText}
-                      onChange={(e) => setPromptText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handlePromptSubmit();
-                        }
-                      }}
-                      placeholder="Poser une question, saisir des coordonnées géodésiques, ou glisser un plan cadastral (Image ou PDF)..."
-                      className="w-full bg-transparent text-base sm:text-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none font-normal leading-relaxed selection:bg-white/20"
-                    />
-
-                    {/* Attached File Pill Preview if file dropped/selected */}
-                    {attachedFile && (
-                      <div className="inline-flex items-center gap-2 mt-2 px-3.5 py-1.5 rounded-xl bg-white/[0.08] border border-white/[0.12] text-xs text-zinc-200 shadow-sm">
-                        <FileText className="w-4 h-4 text-emerald-400" />
-                        <span className="font-mono truncate max-w-[240px]">
-                          {attachedFile.name}
-                        </span>
-                        <span className="text-[10px] text-zinc-400">
-                          ({(attachedFile.size / 1024).toFixed(0)} KB)
-                        </span>
-                        <button
-                          onClick={() => setAttachedFile(null)}
-                          className="text-zinc-400 hover:text-white ml-1"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Inline status while the AI extraction runs */}
-                    {isProcessing && (
-                      <div className="flex items-center gap-2 mt-2 text-xs text-zinc-300">
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
-                        <span>Analyse du plan en cours via Muse Spark…</span>
-                      </div>
-                    )}
-
-                    {/* Inline extraction error with explicit recovery choices
-                        (manual entry is a choice, never a silent fallback) */}
-                    {extractError && (
-                      <div className="mt-2 rounded-xl border border-red-400/30 bg-red-500/[0.08] px-3.5 py-2.5">
-                        <p className="text-xs text-red-300 leading-relaxed">{extractError}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <button
-                            type="button"
-                            onClick={() => attachedFile && handleFileUpload(attachedFile)}
-                            className="px-2.5 py-1 rounded-lg bg-white/[0.08] border border-white/[0.12] text-[11px] text-zinc-200 hover:bg-white/[0.14] transition"
-                          >
-                            Réessayer l'extraction
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExtractError(null);
-                              setAttachedFile(null);
-                              onOpenManualModal();
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-white/[0.08] border border-white/[0.12] text-[11px] text-zinc-200 hover:bg-white/[0.14] transition"
-                          >
-                            Saisie manuelle
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Hidden Real File Input */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,.pdf,.json"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleAttachFile(e.target.files[0]);
-                      }
+                {attachedFile.type === "application/pdf" ? (
+                  <FileText className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                ) : (
+                  <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                )}
+                <span className="truncate max-w-[240px]">{attachedFile.name}</span>
+                {!isProcessing && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAttachedFile(null);
                     }}
+                    className="hover:text-red-400 transition ml-1"
+                    aria-label="Retirer le fichier"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Textarea — only shown when no file is attached or not processing */}
+          {!attachedFile && (
+            <textarea
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={3}
+              placeholder="Entrez des coordonnées UTM, un identifiant de dossier, ou déposez une photo / PDF du plan..."
+              className="w-full bg-transparent text-zinc-900 placeholder:text-zinc-400 text-sm sm:text-base font-normal outline-none resize-none leading-relaxed"
+            />
+          )}
+
+          {/* Document preview + scan animation — shown when file is attached */}
+          <AnimatePresence>
+            {attachedFile && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.25 }}
+                className="relative w-full rounded-2xl overflow-hidden bg-zinc-100 border border-zinc-200"
+                style={{ minHeight: 160 }}
+              >
+                {/* Image preview */}
+                {previewUrl && attachedFile.type.startsWith("image/") && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl}
+                    alt="Aperçu du document"
+                    className="w-full object-contain max-h-56"
                   />
+                )}
 
-                  {/* Bottom Row: Actions Bar */}
-                  <div className="flex items-center justify-between pt-4 mt-2 border-t border-white/[0.06] relative z-10">
-                    {/* Left: Attachment & Upload Actions */}
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-2 sm:px-3 sm:py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition flex items-center gap-2 text-xs font-medium"
-                        title="Importer une image de plan (extraction Muse Spark)"
-                      >
-                        <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
-                        <span className="hidden sm:inline">Image</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-2 sm:px-3 sm:py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition flex items-center gap-2 text-xs font-medium"
-                        title="Joindre un document PDF ou fichier de bornage"
-                      >
-                        <Paperclip className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
-                        <span className="hidden sm:inline">PDF</span>
-                      </button>
-                    </div>
-
-                    {/* Right: Mic & Circular Upward Arrow Submit Button */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={onOpenWhatsAppModal}
-                        className="p-2 sm:p-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.08] transition"
-                        title="Audit via WhatsApp Cloud API"
-                      >
-                        <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-400" />
-                      </button>
-
-                      {/* Circular Action Button with Arrow Up (soft periwinkle matching reference) */}
-                      <button
-                        type="button"
-                        onClick={handlePromptSubmit}
-                        disabled={isProcessing}
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#7C88C2] hover:bg-[#8D99D4] text-white flex items-center justify-center transition-all duration-200 shadow-[0_4px_16px_rgba(124,136,194,0.35)] active:scale-95 disabled:opacity-40 shrink-0"
-                        title="Lancer l'analyse du plan"
-                      >
-                        {isProcessing ? (
-                          <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                        ) : (
-                          <ArrowUp className="w-5 h-5 text-white stroke-[2.75]" />
-                        )}
-                      </button>
-                    </div>
+                {/* PDF placeholder */}
+                {!previewUrl && (
+                  <div className="flex flex-col items-center justify-center gap-3 py-10">
+                    <FileText className="w-10 h-10 text-zinc-400" />
+                    <span className="text-xs text-zinc-500 font-medium truncate max-w-[280px]">
+                      {attachedFile.name}
+                    </span>
                   </div>
-                </div>
-              </div>
-            </div>
+                )}
 
-            {/* Suggestions List (identical in style to Meet AI Mode reference image, with crisp readable dark translucent pills) */}
-            <div className="w-full pt-1 space-y-2">
-              <button
+                {/* Scanning overlay — only while processing */}
+                {isProcessing && (
+                  <>
+                    {/* Dimming veil */}
+                    <div className="absolute inset-0 bg-black/30" />
+                    {/* Animated scan laser line */}
+                    <motion.div
+                      className="absolute inset-x-0 h-[3px] pointer-events-none z-10"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, transparent 0%, #3B82F6 40%, #60A5FA 50%, #3B82F6 60%, transparent 100%)",
+                        boxShadow: "0 0 16px 4px rgba(59,130,246,0.6)",
+                      }}
+                      initial={{ top: "0%" }}
+                      animate={{ top: ["0%", "100%", "0%"] }}
+                      transition={{
+                        duration: 1.8,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    />
+                    {/* Processing label */}
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-t from-black/60 to-transparent">
+                      <Loader2 className="w-3.5 h-3.5 text-blue-300 animate-spin" />
+                      <span className="text-[11px] text-blue-200 font-mono tracking-wide">
+                        Analyse en cours...
+                      </span>
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bottom controls row */}
+          <div className="mt-5 pt-3.5 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200/90">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Image picker */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isProcessing}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                <span>Image (PNG, JPG)</span>
+              </motion.button>
+
+              {/* PDF picker */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                onClick={() => pdfInputRef.current?.click()}
+                disabled={isProcessing}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50"
+              >
+                <FileText className="w-3.5 h-3.5 text-red-600" />
+                <span>Document PDF</span>
+              </motion.button>
+
+              {/* WhatsApp */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                onClick={onOpenWhatsAppModal}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                <span>WhatsApp API</span>
+              </motion.button>
+
+              {/* Manual entry */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 type="button"
                 onClick={onOpenManualModal}
-                className="group flex items-center gap-3 text-left w-full px-3.5 py-2 rounded-xl bg-[#080A0F]/85 backdrop-blur-md border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] text-xs sm:text-sm text-zinc-300 hover:text-white transition shadow-sm"
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-300 transition shrink-0" />
-                <span className="truncate">Auditer les coordonnées géodésiques d&apos;un plan de bornage (UTM 32N / 33N)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="group flex items-center gap-3 text-left w-full px-3.5 py-2 rounded-xl bg-[#080A0F]/85 backdrop-blur-md border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] text-xs sm:text-sm text-zinc-300 hover:text-white transition shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-sky-400/80 group-hover:text-sky-300 transition shrink-0" />
-                <span className="truncate">Extraire les bornes depuis une image ou PDF cadastral via Muse Spark</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPromptText("Vérifier la conformité de superficie légale selon le Décret MINDCAF N° 76-165")}
-                className="group flex items-center gap-3 text-left w-full px-3.5 py-2 rounded-xl bg-[#080A0F]/85 backdrop-blur-md border border-white/[0.06] hover:border-white/[0.14] hover:bg-white/[0.04] text-xs sm:text-sm text-zinc-300 hover:text-white transition shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400/80 group-hover:text-emerald-300 transition shrink-0" />
-                <span className="truncate">Contrôler la tolérance réglementaire de superficie foncière (Décret MINDCAF 76-165)</span>
-              </button>
+                <Compass className="w-3.5 h-3.5 text-zinc-600" />
+                <span>Saisie Manuelle</span>
+              </motion.button>
             </div>
+
+            {/* Submit button — user must press this to start analysis */}
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              type="button"
+              onClick={handlePromptSubmit}
+              disabled={isProcessing}
+              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-full text-xs sm:text-sm font-semibold bg-[#0B0F19] hover:bg-black text-white shadow-md shadow-black/25 transition-all active:scale-95 disabled:opacity-50 shrink-0"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  <span>Analyse IA...</span>
+                </>
+              ) : (
+                <>
+                  <span>Auditer le plan</span>
+                  <ArrowUp className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                </>
+              )}
+            </motion.button>
           </div>
         </div>
-      </section>
 
-      {/* 5. LOGO / AUTHORITY MARQUEE STRIP */}
-      <PartnerLogos />
+        {/* Error notification */}
+        <AnimatePresence>
+          {extractError && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.97 }}
+              className="mt-4 px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 flex items-start gap-2.5 max-w-xl text-left"
+            >
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span>{extractError}</span>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleLoadSample("douala_yassa_utm32n.json")
+                    }
+                    className="underline hover:text-white transition"
+                  >
+                    Tester un plan conforme
+                  </button>
+                  <span className="text-zinc-500">·</span>
+                  <button
+                    type="button"
+                    onClick={onOpenManualModal}
+                    className="underline hover:text-white transition"
+                  >
+                    Saisie manuelle
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* 6. LOWER SECTION: "Built for Real-Time Cadastral Intelligence" */}
-      <section id="geodesy" className="w-full pt-20 pb-24 px-6 flex flex-col items-center text-center">
-        {/* Section Headline */}
-        <h2 className="text-3xl sm:text-5xl font-medium tracking-tight text-white max-w-2xl leading-[1.1]">
-          Conçu pour l&apos;Audit Cadastral
-          <br />
-          en Temps Réel
-        </h2>
-
-        {/* Section Subtitle */}
-        <p className="text-xs sm:text-sm text-zinc-400 max-w-lg mt-4 leading-relaxed font-normal">
-          Précision géodésique absolue, projection de Snyder et clarté juridique — même sur les dossiers de titres fonciers les plus complexes du Cameroun.
+        {/* Neutral capability badge — no government claim */}
+        <p className="hero-anim-trust mt-5 text-[11px] font-mono text-zinc-500 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#60A5FA]" />
+          <span>Outil indépendant de vérification géodésique · Calcul UTM/WGS84</span>
         </p>
 
-        {/* Two Action Buttons */}
-        <div className="flex items-center gap-3 mt-7 mb-14">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => fileInputRef.current?.click()}
+        {/* Quick-load sample chips */}
+        <div className="hero-anim-samples mt-6 flex flex-wrap items-center justify-center gap-2.5">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            type="button"
+            onClick={() => handleLoadSample("douala_yassa_utm32n.json")}
+            className="px-3.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-zinc-300 hover:text-white transition"
           >
-            Auditer un plan
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={onOpenDashboard}
+            Douala Yassa (980 m² · Conforme)
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            type="button"
+            onClick={() =>
+              handleLoadSample("douala_yassa_fraud_superficie.json")
+            }
+            className="px-3.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-zinc-300 hover:text-white transition"
           >
-            Explorer la carte
-          </Button>
+            Alerte Fraude (+53% Fictive)
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            type="button"
+            onClick={() => handleLoadSample("yaounde_odza_utm32n.json")}
+            className="px-3.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-zinc-300 hover:text-white transition"
+          >
+            Yaoundé Odza (2 100 m² · 5 bornes)
+          </motion.button>
         </div>
+      </main>
 
-        {/* Twin Comparison Cards with Center Floating Button (System Descriptors, Zero Dummy Fakes) */}
-        <div className="relative w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Card 1: Declared Paper Survey Plan */}
-          <Card className="p-6 text-left space-y-4">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-zinc-200">Plan Cadastral Numérisé</span>
-              <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-mono text-zinc-400">
-                Muse Spark · Meta Model API
-              </span>
-            </div>
-
-            {/* Vocel Audio/Vector Waveform Visualizer */}
-            <WaveformVisualizer type="declared" />
-
-            <div className="space-y-1">
-              <h4 className="text-xs font-semibold text-white">Extraction instantanée du bornage.</h4>
-              <p className="text-[11px] text-zinc-400 leading-relaxed font-normal">
-                Muse Spark (Meta Model API) localise le tableau des bornes et numérise les coordonnées en direct, sans saisie manuelle.
-              </p>
-            </div>
-          </Card>
-
-          {/* Floating Center Icon */}
-          <div className="hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white text-black items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.3)]">
-            <Play className="w-4 h-4 fill-black text-black ml-0.5" />
-          </div>
-
-          {/* Card 2: Verified Geodetic Output */}
-          <Card className="p-6 text-left space-y-4">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-white">Audit Géodésique Autonome</span>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400">
-                Décret N° 76-165
-              </span>
-            </div>
-
-            {/* Vocel Audio/Vector Waveform Visualizer */}
-            <WaveformVisualizer type="verified" />
-
-            <div className="space-y-1">
-              <h4 className="text-xs font-semibold text-white">Précision géométrique absolue.</h4>
-              <p className="text-[11px] text-zinc-400 leading-relaxed font-normal">
-                Gauss-Shoelace calcule la véritable empreinte au sol. Les discordances sont certifiées conformes aux tolérances réglementaires.
-              </p>
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      {/* 7. FOOTER */}
-      <footer className="w-full border-t border-white/[0.08] py-6 px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500 font-mono">
-        <span>CADASTRA-CAMEROON · META GLOBAL AI DEVELOPER HACKATHON 2026</span>
-        <span>MINDCAF · SYSTÈME NATIONAL DE VÉRIFICATION FONCIÈRE</span>
+      {/* Footer */}
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-500 font-mono border-t border-white/[0.06]">
+        <span>CADASTRA CM · META GLOBAL AI DEVELOPER HACKATHON 2026</span>
+        <span className="mt-1 sm:mt-0">MUSE SPARK 1.3 &amp; SAM 3.1 · GÉODÉSIE CAMEROUN</span>
       </footer>
     </div>
   );

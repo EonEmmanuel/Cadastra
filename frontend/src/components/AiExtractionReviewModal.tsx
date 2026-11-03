@@ -1,16 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   Sparkles,
-  CheckCircle2,
-  AlertCircle,
   FileText,
-  Compass,
   ArrowRight,
-  ShieldCheck,
-  Edit3,
 } from "lucide-react";
 import { PlanVerificationRequest, BeaconInput, PlanExtractionPreview } from "@/types/cadastre";
 
@@ -37,6 +32,28 @@ export default function AiExtractionReviewModal({
   const [statedArea, setStatedArea] = useState<number>(extractedPlan.stated_area_sqm);
   const [utmZone, setUtmZone] = useState<"32N" | "33N">(extractedPlan.utm_zone);
   const [beacons, setBeacons] = useState<BeaconInput[]>(extractedPlan.beacons);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // A second upload reuses this component instance: re-sync the editable form
+  // with the new extraction instead of showing the previous document's values.
+  useEffect(() => {
+    setLocality(extractedPlan.locality);
+    setPlanId(extractedPlan.plan_id);
+    setTitleNumber(extractedPlan.title_number || "");
+    setStatedArea(extractedPlan.stated_area_sqm);
+    setUtmZone(extractedPlan.utm_zone);
+    setBeacons(extractedPlan.beacons);
+    setFormError(null);
+  }, [extractedPlan]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -44,31 +61,66 @@ export default function AiExtractionReviewModal({
     const updated = [...beacons];
     updated[index] = { ...updated[index], [field]: value };
     setBeacons(updated);
+    setFormError(null);
   };
 
   const handleConfirm = () => {
+    const numericBeacons = beacons.map((b) => ({
+      ...b,
+      x: Number(b.x),
+      y: Number(b.y),
+      z: b.z ? Number(b.z) : undefined,
+    }));
+
+    if (
+      numericBeacons.some(
+        (beacon) => !Number.isFinite(beacon.x) || !Number.isFinite(beacon.y)
+      )
+    ) {
+      setFormError(
+        "Une ou plusieurs bornes ont des coordonnées X/Y invalides. Corrigez-les avant de lancer l'audit."
+      );
+      return;
+    }
+
+    if (!Number.isFinite(Number(statedArea)) || Number(statedArea) <= 0) {
+      setFormError("La surface déclarée doit être un nombre supérieur à 0 m².");
+      return;
+    }
+
+    if (!planId.trim() || !locality.trim()) {
+      setFormError("La référence du plan et la localité sont obligatoires.");
+      return;
+    }
+
     const confirmed: PlanVerificationRequest = {
       ...extractedPlan,
-      locality,
-      plan_id: planId,
-      title_number: titleNumber || undefined,
-      stated_area_sqm: statedArea,
+      locality: locality.trim(),
+      plan_id: planId.trim(),
+      title_number: titleNumber.trim() || undefined,
+      stated_area_sqm: Number(statedArea),
       utm_zone: utmZone,
-      beacons: beacons.map((b) => ({
-        ...b,
-        x: Number(b.x),
-        y: Number(b.y),
-        z: b.z ? Number(b.z) : undefined,
-      })),
+      beacons: numericBeacons,
     };
     onConfirm(confirmed);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       {/* Outer Shell */}
-      <div className="w-full max-w-4xl p-2 rounded-3xl bg-white/[0.02] ring-1 ring-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-review-title"
+        className="w-full max-w-4xl p-2 rounded-3xl bg-white/[0.02] ring-1 ring-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+      >
         {/* Inner Surface */}
         <div className="rounded-2xl bg-[#090B10] flex flex-col flex-1 overflow-hidden">
           {/* Header */}
@@ -78,7 +130,7 @@ export default function AiExtractionReviewModal({
                 <Sparkles className="w-5 h-5 text-[#00DF8F]" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                <h3 id="ai-review-title" className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
                   Extraction Multimodale Vision AI & Revue Humaine
                   <span className="px-2 py-0.5 rounded-full bg-[#00DF8F]/15 text-[#00DF8F] text-[10px] font-mono">
                     Muse Spark · pipeline en direct
@@ -92,6 +144,7 @@ export default function AiExtractionReviewModal({
 
             <button
               onClick={onClose}
+              aria-label="Fermer"
               className="p-2 rounded-xl hover:bg-white/[0.06] text-zinc-400 hover:text-white transition"
             >
               <X className="w-4 h-4" />
@@ -99,7 +152,7 @@ export default function AiExtractionReviewModal({
           </div>
 
           {/* Body: Split View (Document Scan Preview + Interactive Human-in-the-Loop Review) */}
-          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div data-lenis-prevent className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Column (5 cols): The user's actual document + the real
                 Muse Spark grounding box (normalized 0-1000 grid, 0,0 = top-left).
                 No simulated blueprint, no invented rows. */}
@@ -330,7 +383,7 @@ export default function AiExtractionReviewModal({
                   </span>
                 </div>
 
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                <div data-lenis-prevent className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                   {beacons.map((b, idx) => (
                     <div
                       key={idx}
@@ -369,6 +422,13 @@ export default function AiExtractionReviewModal({
                   ))}
                 </div>
               </div>
+
+              {/* Inline validation */}
+              {formError && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/[0.08] px-3.5 py-2.5 text-xs text-red-300">
+                  {formError}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="pt-2 flex items-center justify-between">

@@ -6,7 +6,7 @@
  * - Exact Gauss / Shoelace metric polygon area calculation.
  * - Mathematical line-segment self-intersection detection (bow-tie topology detection).
  * - Segment distance and azimuth bearing calculation.
- * - MINDCAF standard tolerance evaluation (Décret 76-165: max 1.0% or 5 m²).
+ * - Geodetic area tolerance evaluation (threshold: 1.0% or 5 m²).
  */
 
 import { BeaconInput, BeaconWGS84, BoundarySegment, RiskLevel } from "@/types/cadastre";
@@ -198,7 +198,7 @@ export function verifyCadastralPlanLocally(request: {
       ? Math.round((discrepancySqm / computedArea) * 10000) / 100
       : 100.0;
 
-  // MINDCAF Cadastral tolerance (Décret 76-165):
+  // Standard geodetic area tolerance:
   // Maximum of 1.0% or 5.0 m² for residential parcels
   const allowedTol = Math.max(5.0, computedArea * 0.01);
   const tolerancePassed =
@@ -282,22 +282,22 @@ export function verifyCadastralPlanLocally(request: {
     recommendations_fr:
       riskLevel === "LOW"
         ? [
-            "Plan conforme aux normes cadastrales MINDCAF (Décret 76-165).",
-            "La parcelle est juridiquement éligible à l'immatriculation foncière.",
+            "Plan conforme aux calculs géodésiques UTM WGS84.",
+            "La superficie calculée correspond à la surface déclarée.",
           ]
         : [
-            "ALERTE FRAUDE : Ne pas signer d'acte notarié sur la base de ce plan.",
-            "Solliciter un contre-bornage contradictoire auprès du Service Départemental du Cadastre.",
+            "ALERTE ANOMALIE : Écart de superficie supérieur au seuil de tolérance (1.0%).",
+            "Faire vérifier les coordonnées sur le terrain par un géomètre-expert assermenté.",
           ],
     recommendations_en:
       riskLevel === "LOW"
         ? [
-            "Survey plan complies with MINDCAF cadastral standards.",
-            "Parcel cleared for land title registration.",
+            "Survey plan complies with UTM WGS84 geodetic calculations.",
+            "Calculated area matches the stated boundary area.",
           ]
         : [
-            "FRAUD ALERT: Do not sign any notarial deed.",
-            "Request an official counter-survey from MINDCAF.",
+            "DISCREPANCY ALERT: Area variance exceeds standard tolerance threshold (1.0%).",
+            "Have coordinates verified on site by a licensed surveyor.",
           ],
     verification_hash:
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

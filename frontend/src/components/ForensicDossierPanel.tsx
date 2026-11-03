@@ -19,6 +19,7 @@ import {
   PlanVerificationResponse,
   PlanVerificationRequest,
 } from "@/types/cadastre";
+import { getVerdict } from "@/utils/records";
 
 interface ForensicDossierPanelProps {
   result: PlanVerificationResponse | null;
@@ -44,8 +45,8 @@ export default function ForensicDossierPanel({
 
   if (isLoading) {
     return (
-      <div className="w-full h-full rounded-2xl bg-[#090B10] p-6 flex flex-col justify-center items-center text-center">
-        <div className="w-8 h-8 rounded-full border-2 border-[#00DF8F] border-t-transparent animate-spin mb-3" />
+      <div className="w-full h-full rounded-2xl bg-[#040711] p-6 flex flex-col justify-center items-center text-center">
+        <div className="w-8 h-8 rounded-full border-2 border-[#60A5FA] border-t-transparent animate-spin mb-3" />
         <p className="text-xs font-mono text-zinc-400">
           Calcul géodésique Gauss-Shoelace en cours...
         </p>
@@ -55,7 +56,7 @@ export default function ForensicDossierPanel({
 
   if (!result || !request) {
     return (
-      <div className="w-full h-full rounded-2xl bg-[#090B10] border border-white/[0.08] p-6 flex flex-col justify-center items-center text-center space-y-3">
+      <div className="w-full h-full rounded-2xl bg-[#040711] border border-white/[0.08] p-6 flex flex-col justify-center items-center text-center space-y-3">
         <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
           <FileText className="w-6 h-6 text-zinc-500" />
         </div>
@@ -69,25 +70,26 @@ export default function ForensicDossierPanel({
     );
   }
 
-  const isFraud = result.superficie_fictive_detected || result.risk_level === "CRITICAL_FRAUD";
-  const isValid = result.risk_level === "LOW" && result.tolerance_passed;
-  const isAnomaly = result.self_intersecting || result.risk_level === "HIGH";
+  const verdict = getVerdict(result);
+  const isFraud = verdict.tone === "danger";
+  const isValid = verdict.tone === "success";
+  const isAnomaly = verdict.tone === "warning";
 
   const lat = result.centroid_wgs84?.latitude || 4.0436;
   const lng = result.centroid_wgs84?.longitude || 9.7511;
   const googleMapsUrl = `https://maps.google.com/?q=${lat},${lng}&t=k&z=18`;
 
   const handleShare = () => {
-    const summary = `[CADASTRA-CAMEROON · AUDIT GÉODÉSIQUE]\nPlan: ${result.plan_id} (${request.title_number || "Titre en cours"})\nLocalité: ${request.locality}\nSurface Déclarée: ${result.stated_area_sqm} m²\nSurface Calculée: ${result.computed_area_sqm} m²\nÉcart: ${result.discrepancy_percentage.toFixed(2)}%\nVerdict: ${isValid ? "CONFORME MINDCAF (Décret 76-165)" : "ALERTE FRAUDE FONCIÈRE"}\nEmpreinte SHA-256: ${result.verification_hash}`;
+    const summary = `[CADASTRA-CAMEROON · AUDIT GÉODÉSIQUE]\nPlan: ${result.plan_id} (${request.title_number || "Titre en cours"})\nLocalité: ${request.locality}\nSurface Déclarée: ${result.stated_area_sqm} m²\nSurface Calculée: ${result.computed_area_sqm} m²\nÉcart: ${result.discrepancy_percentage.toFixed(2)}%\nVerdict: ${verdict.label.toUpperCase()}\nEmpreinte SHA-256: ${result.verification_hash}`;
     navigator.clipboard.writeText(summary);
     setCopiedShare(true);
     setTimeout(() => setCopiedShare(false), 2000);
   };
 
-  const riskScore = isFraud ? 95 : isAnomaly ? 70 : 12;
+  const riskScore = Math.round(result.risk_score);
 
   return (
-    <div className="w-full h-full rounded-2xl bg-[#090B10] border border-white/[0.08] flex flex-col justify-between overflow-hidden shadow-2xl font-sans">
+    <div className="w-full h-full rounded-2xl bg-[#040711] border border-white/[0.08] flex flex-col justify-between overflow-hidden shadow-2xl font-sans">
       {/* 1. TOP HEADER & TABS */}
       <div className="p-4 sm:p-5 pb-0 space-y-3">
         {/* Parcel Title & Risk Badge */}
@@ -115,13 +117,13 @@ export default function ForensicDossierPanel({
             onClick={() => setActiveTab("overview")}
             className={`pb-2 transition relative ${
               activeTab === "overview"
-                ? "text-emerald-400 font-semibold"
+                ? "text-[#93C5FD] font-semibold"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             Vue d&apos;ensemble
             {activeTab === "overview" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400 rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#60A5FA] rounded-full" />
             )}
           </button>
 
@@ -129,13 +131,13 @@ export default function ForensicDossierPanel({
             onClick={() => setActiveTab("technical")}
             className={`pb-2 transition relative ${
               activeTab === "technical"
-                ? "text-emerald-400 font-semibold"
+                ? "text-[#93C5FD] font-semibold"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             Détails techniques
             {activeTab === "technical" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400 rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#60A5FA] rounded-full" />
             )}
           </button>
 
@@ -143,13 +145,13 @@ export default function ForensicDossierPanel({
             onClick={() => setActiveTab("history")}
             className={`pb-2 transition relative ${
               activeTab === "history"
-                ? "text-emerald-400 font-semibold"
+                ? "text-[#93C5FD] font-semibold"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             Historique
             {activeTab === "history" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400 rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#60A5FA] rounded-full" />
             )}
           </button>
 
@@ -157,13 +159,13 @@ export default function ForensicDossierPanel({
             onClick={() => setActiveTab("documents")}
             className={`pb-2 transition relative ${
               activeTab === "documents"
-                ? "text-emerald-400 font-semibold"
+                ? "text-[#93C5FD] font-semibold"
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             Documents
             {activeTab === "documents" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-400 rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#60A5FA] rounded-full" />
             )}
           </button>
         </div>
@@ -309,10 +311,10 @@ export default function ForensicDossierPanel({
                     </span>
                     <p className="text-[11px] text-zinc-300 leading-relaxed font-normal">
                       {isFraud
-                        ? `Superficie réelle calculée (${result.computed_area_sqm.toLocaleString()} m²) inférieure à la superficie déclarée (${result.stated_area_sqm.toLocaleString()} m²). L'écart dépasse les tolérances autorisées par le Décret 76-165.`
+                        ? `Superficie réelle calculée (${result.computed_area_sqm.toLocaleString()} m²) inférieure à la superficie déclarée (${result.stated_area_sqm.toLocaleString()} m²). L'écart dépasse le seuil géodésique de tolérance (1.0%).`
                         : isAnomaly
                         ? "Les segments du polygone se croisent. Le périmètre cadastral est géométriquement invalide."
-                        : "Les coordonnées UTM concordent avec la surface déclarée. Tolérance réglementaire respectée."}
+                        : "Les coordonnées UTM concordent avec la surface déclarée. Tolérance géodésique respectée."}
                     </p>
                   </div>
                 </div>
@@ -343,12 +345,9 @@ export default function ForensicDossierPanel({
                 <div className="w-full h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      isFraud
-                        ? "bg-red-400 w-[95%]"
-                        : isAnomaly
-                        ? "bg-amber-400 w-[70%]"
-                        : "bg-emerald-400 w-[12%]"
+                      isFraud ? "bg-red-400" : isAnomaly ? "bg-amber-400" : "bg-emerald-400"
                     }`}
+                    style={{ width: `${Math.min(100, Math.max(3, riskScore))}%` }}
                   />
                 </div>
               </div>
@@ -463,7 +462,7 @@ export default function ForensicDossierPanel({
                 <div>
                   <div className="font-semibold text-white">Date de Vérification</div>
                   <div className="text-[11px] text-zinc-400">
-                    {new Date().toLocaleDateString("fr-FR", {
+                    {new Date(result.timestamp || Date.now()).toLocaleDateString("fr-FR", {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
@@ -475,11 +474,11 @@ export default function ForensicDossierPanel({
               </div>
 
               <div className="flex items-start gap-2 p-2.5 rounded-xl bg-white/[0.02]">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
                 <div>
-                  <div className="font-semibold text-white">Norme Réglementaire</div>
+                  <div className="font-semibold text-white">Référentiel Géodésique</div>
                   <div className="text-[11px] text-zinc-400">
-                    Décret N° 76-165 fixant les conditions d&apos;obtention du Titre Foncier au Cameroun.
+                    Projection UTM Snyder ellipsoïde WGS84 (Zone 32N / 33N).
                   </div>
                 </div>
               </div>
@@ -496,10 +495,10 @@ export default function ForensicDossierPanel({
             <div className="space-y-2">
               <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-emerald-400" />
+                  <FileText className="w-4 h-4 text-blue-400" />
                   <div>
                     <p className="text-white font-medium">Certificat d&apos;Audit Géodésique</p>
-                    <p className="text-[10px] text-zinc-500">Format officiel PDF bilingue</p>
+                    <p className="text-[10px] text-zinc-500">Rapport technique bilingue FR / EN</p>
                   </div>
                 </div>
 
@@ -522,11 +521,11 @@ export default function ForensicDossierPanel({
         <button
           onClick={onDownloadPdf}
           disabled={isDownloadingPdf}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-xs tracking-tight transition hover:bg-zinc-200 shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+          className="flex-1 px-4 py-2.5 rounded-xl bg-white text-zinc-900 font-semibold text-xs tracking-tight transition hover:bg-zinc-100 shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Download className="w-3.5 h-3.5" />
           <span>
-            {isDownloadingPdf ? "Génération du PDF..." : "Télécharger le rapport officiel"}
+            {isDownloadingPdf ? "Génération du PDF..." : "Télécharger le rapport d'audit"}
           </span>
         </button>
 

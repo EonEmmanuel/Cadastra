@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   MessageCircle,
@@ -31,9 +31,18 @@ export default function WhatsAppChannelModal({
   const [webhookLog, setWebhookLog] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
-  const samplePrompt = "PLAN-OFFICIEL Localité: Douala B1: 583420, 446100 B2: 583455, 446100 B3: 583455, 446072 B4: 583420, 446072 surface: 980 m2";
+  const samplePrompt = "AUDIT-PLAN Localité: Douala B1: 583420, 446100 B2: 583455, 446100 B3: 583455, 446072 B4: 583420, 446072 surface: 980 m2";
 
   const handleCopySample = () => {
     navigator.clipboard.writeText(samplePrompt);
@@ -92,11 +101,22 @@ export default function WhatsAppChannelModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md font-sans">
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md font-sans"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       {/* Outer Shell */}
-      <div className="w-full max-w-2xl p-2 rounded-3xl bg-white/[0.02] ring-1 ring-white/[0.08] shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="whatsapp-channel-title"
+        className="w-full max-w-2xl p-2 rounded-3xl bg-white/[0.02] ring-1 ring-white/[0.08] shadow-2xl"
+      >
         {/* Inner Surface */}
-        <div className="rounded-2xl bg-[#090A0E] p-6 space-y-6 max-h-[85vh] overflow-y-auto">
+        <div data-lenis-prevent className="rounded-2xl bg-[#090A0E] p-6 space-y-6 max-h-[85vh] overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between pb-1">
             <div className="flex items-center gap-2.5">
@@ -104,7 +124,7 @@ export default function WhatsAppChannelModal({
                 <MessageCircle className="w-4 h-4 text-[#25D366]" />
               </div>
               <div>
-                <h3 className="text-sm font-display font-bold text-white tracking-tight">
+                <h3 id="whatsapp-channel-title" className="text-sm font-display font-bold text-white tracking-tight">
                   Canal WhatsApp Terrain (Meta Cloud API)
                 </h3>
                 <p className="text-xs text-zinc-400">
@@ -115,6 +135,7 @@ export default function WhatsAppChannelModal({
 
             <button
               onClick={onClose}
+              aria-label="Fermer"
               className="p-2 rounded-xl hover:bg-white/[0.06] text-zinc-400 hover:text-white transition"
             >
               <X className="w-4 h-4" />
@@ -144,12 +165,12 @@ export default function WhatsAppChannelModal({
             </div>
 
             <div className="p-4 rounded-2xl bg-white/[0.02] space-y-1">
-              <span className="font-mono text-[10px] text-[#00DF8F] font-bold block tracking-wider">
-                03. CERTIFICAT MINDCAF
+              <span className="font-mono text-[10px] text-[#60A5FA] font-bold block tracking-wider">
+                03. CERTIFICAT GÉODÉSIQUE
               </span>
               <p className="text-white font-medium">Rapport PDF SHA-256</p>
               <p className="text-zinc-400 text-[11px] leading-relaxed">
-                Réponse instantanée avec lien de téléchargement officiel.
+                Réponse instantanée avec lien de téléchargement du rapport d&apos;audit.
               </p>
             </div>
           </div>
@@ -176,7 +197,7 @@ export default function WhatsAppChannelModal({
               rel="noreferrer"
               className="px-5 py-2.5 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-black font-semibold text-xs transition flex items-center gap-1.5 shrink-0 shadow-xl"
             >
-              <span>Ouvrir WhatsApp</span>
+              <span>Partager sur WhatsApp</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
@@ -209,6 +230,10 @@ export default function WhatsAppChannelModal({
             </div>
 
             <div className="space-y-2">
+              <p className="text-[10px] leading-relaxed text-zinc-500">
+                Charge utile de test envoyée au webhook local. Aucun message
+                réel n&apos;est délivré à un numéro citoyen.
+              </p>
               <textarea
                 rows={2}
                 value={customMsg}

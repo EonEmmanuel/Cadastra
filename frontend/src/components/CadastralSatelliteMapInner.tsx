@@ -19,9 +19,7 @@ import {
   ZoomOut,
   Ruler,
   Compass,
-  Calendar,
   Layers,
-  ChevronDown,
 } from "lucide-react";
 import { BeaconWGS84, BoundarySegment, RiskLevel } from "@/types/cadastre";
 
@@ -58,7 +56,7 @@ function MapBoundsController({
         beacons.map((b) => [b.latitude, b.longitude] as [number, number])
       );
       if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 19, animate: true });
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 18, animate: true });
       }
     } catch (e) {
       console.warn("Bounds fit error", e);
@@ -71,9 +69,11 @@ function MapBoundsController({
 // Map Event Tracker
 function MapEventTracker({
   onCoordsChange,
+  onZoomChange,
   setMapInstance,
 }: {
   onCoordsChange: (coords: { lat: number; lng: number }) => void;
+  onZoomChange: (zoom: number) => void;
   setMapInstance: (map: L.Map) => void;
 }) {
   const map = useMapEvents({
@@ -83,11 +83,15 @@ function MapEventTracker({
     move() {
       onCoordsChange(map.getCenter());
     },
+    zoomend() {
+      onZoomChange(map.getZoom());
+    },
   });
 
   useEffect(() => {
     setMapInstance(map);
-  }, [map, setMapInstance]);
+    onZoomChange(map.getZoom());
+  }, [map, onZoomChange, setMapInstance]);
 
   return null;
 }
@@ -107,10 +111,13 @@ export default function CadastralSatelliteMapInner({
   selectedBorneId,
   onSelectBorne,
 }: CadastralSatelliteMapProps) {
-  const isFraud = riskLevel === "CRITICAL_FRAUD" || riskLevel === "HIGH";
+  const isCritical = riskLevel === "CRITICAL_FRAUD";
+  const isAnomaly = riskLevel === "HIGH" || riskLevel === "MEDIUM";
+  const isFraud = isCritical || isAnomaly;
   const [tileMode, setTileMode] = useState<"satellite" | "carte" | "mixte">("satellite");
   const [showMeasure, setShowMeasure] = useState<boolean>(true);
   const [fitKey, setFitKey] = useState<number>(0);
+  const [zoom, setZoom] = useState<number>(18);
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,14 +154,18 @@ export default function CadastralSatelliteMapInner({
 
   // Beacon Marker Pin (Clean Glass Badge)
   const createBeaconIcon = (borneId: string, isSelected: boolean) => {
+    const tone = isCritical
+      ? "bg-[#090A0E] text-red-400 ring-1 ring-red-500/40"
+      : isAnomaly
+      ? "bg-[#090A0E] text-amber-400 ring-1 ring-amber-500/40"
+      : "bg-[#090A0E] text-[#00DF8F] ring-1 ring-[#00DF8F]/40";
+
     return L.divIcon({
       className: "beacon-marker-icon",
       html: `
-        <div class="flex items-center justify-center w-6 h-6 rounded-lg font-mono text-[10px] font-bold shadow-xl transition-all ${
-          isFraud
-            ? "bg-[#090A0E] text-red-400 ring-1 ring-red-500/40"
-            : "bg-[#090A0E] text-[#00DF8F] ring-1 ring-[#00DF8F]/40"
-        } ${isSelected ? "scale-125 ring-2 ring-white" : ""}">
+        <div class="flex items-center justify-center w-6 h-6 rounded-lg font-mono text-[10px] font-bold shadow-xl transition-all ${tone} ${
+        isSelected ? "scale-125 ring-2 ring-white" : ""
+      }">
           ${borneId}
         </div>
       `,
@@ -163,24 +174,37 @@ export default function CadastralSatelliteMapInner({
     });
   };
 
-  // Modern Floating Tactical Overlay Callouts (Image 1 Style)
-  const createBubbleIcon = (title: string, subtitle: string, variant: "green" | "red") => {
-    const isRed = variant === "red";
+  // Compact Floating Tactical Overlay Callouts (Clean, proportional badge)
+  const createBubbleIcon = (
+    title: string,
+    subtitle: string,
+    variant: "green" | "red" | "amber"
+  ) => {
+    const tone =
+      variant === "red"
+        ? "bg-[#060913]/90 text-red-300 ring-1 ring-red-500/30"
+        : variant === "amber"
+        ? "bg-[#060913]/90 text-amber-300 ring-1 ring-amber-500/30"
+        : "bg-[#060913]/90 text-blue-200 ring-1 ring-[#60A5FA]/30";
+    const dot =
+      variant === "red"
+        ? "bg-red-400 shadow-[0_0_6px_#EF4444]"
+        : variant === "amber"
+        ? "bg-amber-400 shadow-[0_0_6px_#F59E0B]"
+        : "bg-[#60A5FA] shadow-[0_0_6px_#60A5FA]";
+
     return L.divIcon({
       className: "map-overlay-marker",
       html: `
-        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-xl shadow-2xl font-mono text-xs ${
-          isRed
-            ? "bg-[#090A0E]/95 text-red-400 ring-1 ring-red-500/40"
-            : "bg-[#090A0E]/95 text-[#00DF8F] ring-1 ring-[#00DF8F]/40"
-        }">
-          <span class="w-2 h-2 rounded-full ${isRed ? "bg-red-400" : "bg-[#00DF8F]"} animate-pulse"></span>
-          <span class="text-[11px] font-medium text-zinc-300 font-sans">${title}</span>
-          <span class="font-bold font-mono">${subtitle}</span>
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-md shadow-lg text-[10px] whitespace-nowrap ${tone}">
+          <span class="w-1.5 h-1.5 rounded-full ${dot} shrink-0"></span>
+          <span class="font-medium text-zinc-300 font-sans tracking-tight">${title}</span>
+          <span class="text-zinc-500 font-mono">·</span>
+          <span class="font-bold font-mono text-white">${subtitle}</span>
         </div>
       `,
-      iconSize: [220, 36],
-      iconAnchor: [110, 18],
+      iconSize: [150, 26],
+      iconAnchor: [75, 13],
     });
   };
 
@@ -189,10 +213,10 @@ export default function CadastralSatelliteMapInner({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full rounded-2xl bg-[#090B10] flex flex-col overflow-hidden shadow-2xl relative select-none font-sans"
+      className="w-full h-full rounded-2xl bg-[#040711] flex flex-col overflow-hidden shadow-2xl relative select-none font-sans border border-white/[0.08]"
     >
-      {/* 1. TOP CONTROL BAR ABOVE MAP (Image 1 Style) */}
-      <div className="h-12 px-4 flex items-center justify-between gap-4 bg-[#090B10] shrink-0 z-20">
+      {/* 1. TOP CONTROL BAR ABOVE MAP */}
+      <div className="h-12 px-4 flex items-center justify-between gap-4 bg-[#040711] border-b border-white/[0.06] shrink-0 z-20">
         {/* Left: Location indicator */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.04] text-xs font-medium text-zinc-200">
@@ -202,8 +226,14 @@ export default function CadastralSatelliteMapInner({
           </div>
 
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.02] text-xs text-zinc-400">
-            <Calendar className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Dernière mise à jour : 12 avr. 2025</span>
+            <Layers className="w-3.5 h-3.5 text-zinc-500" />
+            <span>
+              {beacons.length > 0
+                ? `${beacons.length} bornes · ${Math.round(
+                    computedArea > 0 ? computedArea : statedArea
+                  ).toLocaleString()} m²`
+                : "Aucune parcelle chargée"}
+            </span>
           </div>
         </div>
 
@@ -247,6 +277,8 @@ export default function CadastralSatelliteMapInner({
         <MapContainer
           center={[centerLat, centerLon]}
           zoom={18}
+          minZoom={4}
+          maxZoom={22}
           zoomControl={false}
           scrollWheelZoom={true}
           className="w-full h-full"
@@ -256,19 +288,19 @@ export default function CadastralSatelliteMapInner({
             <TileLayer
               attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              maxZoom={19}
+              maxNativeZoom={19}
+              maxZoom={22}
             />
           )}
 
           {/* Layer 2: Carte Noire (OSM tiles inverted for a dark, detailed
-              street-level basemap, zoomable to z19 — Replaces Esri Dark Gray
-              Canvas, which caps at z16 and loses detail at parcel scale, and
-              CartoDB Dark Matter, which now requires an API key) */}
+              street-level basemap, zoomable up to z22) */}
           {tileMode === "carte" && (
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maxZoom={19}
+              maxNativeZoom={19}
+              maxZoom={22}
               className="cartedark"
             />
           )}
@@ -279,24 +311,27 @@ export default function CadastralSatelliteMapInner({
               <TileLayer
                 attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                maxZoom={19}
+                maxNativeZoom={19}
+                maxZoom={22}
               />
               <TileLayer
                 url="https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-                maxZoom={19}
+                maxNativeZoom={19}
+                maxZoom={22}
                 opacity={0.8}
               />
             </>
           )}
 
-          {/* Main Cadastral Polygon (Declared Boundary) */}
+          {/* Main Cadastral Polygon — colour follows the real verdict, never a
+              fabricated second polygon */}
           {polygonPositions.length >= 3 && (
             <Polygon
               positions={polygonPositions}
               pathOptions={{
-                color: "#00DF8F",
+                color: isCritical ? "#EF4444" : isAnomaly ? "#F59E0B" : "#00DF8F",
                 weight: 2,
-                fillColor: "#00DF8F",
+                fillColor: isCritical ? "#EF4444" : isAnomaly ? "#F59E0B" : "#00DF8F",
                 fillOpacity: 0.18,
               }}
             >
@@ -308,29 +343,6 @@ export default function CadastralSatelliteMapInner({
                   </div>
                   <div className="text-[10px] text-zinc-500">
                     Projection : {epsgCode} ({utmZone})
-                  </div>
-                </div>
-              </Popup>
-            </Polygon>
-          )}
-
-          {/* Disputed Encroachment Boundary (Superposition Fraud Zone) */}
-          {isFraud && polygonPositions.length >= 3 && (
-            <Polygon
-              positions={polygonPositions.map(([lat, lng]) => [lat - 0.00022, lng + 0.00028])}
-              pathOptions={{
-                color: "#EF4444",
-                weight: 2,
-                dashArray: "5, 4",
-                fillColor: "#EF4444",
-                fillOpacity: 0.28,
-              }}
-            >
-              <Popup>
-                <div className="text-xs p-2 space-y-1 font-sans text-zinc-100 min-w-[180px]">
-                  <div className="font-bold text-xs uppercase text-red-400">Superposition Détectée</div>
-                  <div className="text-[11px] text-zinc-400">
-                    Superficie en excès : <b className="text-red-400 font-mono">+{Math.round(discrepancySqm).toLocaleString()} m²</b>
                   </div>
                 </div>
               </Popup>
@@ -363,31 +375,26 @@ export default function CadastralSatelliteMapInner({
             );
           })}
 
-          {/* On-Map Tactical Callouts (Image 1 Style) */}
+          {/* On-Map Tactical Callout — anchored to the real centroid. The
+              discrepancy is surfaced in the bottom-right HUD below, not as a
+              second marker stacked on the same point. */}
           {centroid && (
             <Marker
               position={[centroid.latitude, centroid.longitude]}
               icon={createBubbleIcon(
                 `Parcelle ${planId}`,
                 `${Math.round(isFraud ? statedArea : computedArea).toLocaleString()} m²`,
-                "green"
-              )}
-            />
-          )}
-
-          {isFraud && centroid && (
-            <Marker
-              position={[centroid.latitude - 0.00022, centroid.longitude + 0.00028]}
-              icon={createBubbleIcon(
-                "Superposition détectée",
-                `+${Math.round(discrepancySqm).toLocaleString()} m²`,
-                "red"
+                isCritical ? "red" : isAnomaly ? "amber" : "green"
               )}
             />
           )}
 
           <MapBoundsController beacons={beacons} fitKey={fitKey} />
-          <MapEventTracker onCoordsChange={setCursorCoords} setMapInstance={setMapInstance} />
+          <MapEventTracker
+            onCoordsChange={setCursorCoords}
+            onZoomChange={setZoom}
+            setMapInstance={setMapInstance}
+          />
         </MapContainer>
 
         {/* LEFT FLOATING CONTROLS TOOLBAR (Image 1 Style) */}
@@ -451,7 +458,7 @@ export default function CadastralSatelliteMapInner({
           <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#090B10]/90 ring-1 ring-white/10 text-zinc-400 backdrop-blur-xl shadow-xl">
             <span>{epsgCode}</span>
             <span className="text-zinc-600">·</span>
-            <span className="font-bold text-zinc-200">200 m</span>
+            <span className="font-bold text-zinc-200">z{zoom}</span>
           </div>
         </div>
 
@@ -462,6 +469,14 @@ export default function CadastralSatelliteMapInner({
             <span className="font-bold text-[#00DF8F]">{totalPerimeter.toFixed(1)} m</span>
             <span className="text-zinc-600">·</span>
             <span className="text-zinc-400">{beacons.length} bornes</span>
+            {isFraud && discrepancySqm > 0 && (
+              <>
+                <span className="text-zinc-600">·</span>
+                <span className={isCritical ? "font-bold text-red-400" : "font-bold text-amber-400"}>
+                  écart +{Math.round(discrepancySqm).toLocaleString()} m²
+                </span>
+              </>
+            )}
           </div>
         )}
       </div>

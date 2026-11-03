@@ -61,6 +61,24 @@ In Cameroon, land tenure disputes and fraud represent over **65% of civil court 
 
 ---
 
+## 🖥️ Frontend Surfaces
+
+The UI is a single App Router page with two modes, both fed by the same live session state:
+
+| Surface | What it does |
+|---|---|
+| **Landing** (`view=landing`) | Hero composer (image/PDF), Vision AI pipeline, geodesy comparison, MINDCAF standards and limits, final CTA, full footer |
+| **Carte** (`tab=carte`) | Leaflet satellite / carte / mixte map, real beacons B1..Bn, verdict-coloured polygon, forensic dossier with technical, history and documents tabs |
+| **Investigations** (`tab=investigations`) | Every completed audit in the session, searchable and filterable, with verdict, declared vs computed area and SHA-256 trace |
+| **Rapports** (`tab=rapports`) | Bilingual PDF certificate list for every audited parcel, regenerated on demand from the backend |
+| **Données** (`tab=donnees`) | Ground-truth Cameroon profiles served by `GET /api/profiles`, loaded and re-verified in one click |
+| **IA & Analyses** (`tab=ia`) | Real extraction provenance (SAM 3.1 ROI, Muse Spark fields, language), pipeline steps and session verdict distribution |
+
+Deep links: `/?view=dashboard&tab=donnees` opens the dataset browser directly.
+
+> The interface never fabricates a parcel, a partner endorsement or a verdict. When the API is unreachable, the dashboard states **Mode local** and uses the documented Snyder/Shoelace fallback; when a dataset cannot be loaded, it shows an explicit recovery path.
+
+
 ## 📂 Project Structure
 
 ```
@@ -78,9 +96,15 @@ Hackerton-Project/
 │       └── test_fraud_detection.py# Superficie fictive & tolerance tests
 ├── frontend/
 │   ├── src/
-│   │   ├── app/                   # Next.js 15 App Router (layout, page, globals)
-│   │   ├── components/            # Leaflet map, verification panel, simulators
-│   │   └── types/                 # TypeScript types
+│   │   ├── app/                   # Next.js 15 App Router (layout, page, globals, error, not-found)
+│   │   ├── components/
+│   │   │   ├── LandingHero.tsx    # Marketing surface: hero, Vision AI, norms, footer
+│   │   │   ├── CadastralSatelliteMap.tsx # Leaflet satellite/carte/mixte viewport
+│   │   │   ├── ForensicDossierPanel.tsx  # Parcel verdict, telemetry, PDF export
+│   │   │   ├── workspaces/        # Investigations, Rapports, Données, IA & Analyses
+│   │   │   └── ui/                # Shared primitives (Button, Card, Badge, HalftoneDome)
+│   │   ├── types/                 # TypeScript types (requests, responses, session records)
+│   │   └── utils/                 # Local Snyder/Shoelace fallback + record helpers
 │   ├── package.json
 │   ├── tailwind.config.ts
 │   └── tsconfig.json
