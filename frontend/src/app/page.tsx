@@ -34,91 +34,95 @@ import { makeRecordId } from "@/utils/records";
 const API_BASE = "http://localhost:8000";
 
 export default function CadastraApp() {
-  const [activeNavTab, setActiveNavTab] = useState<string>("carte");
-  // Default landing view mode is "landing"
-  const [viewMode, setViewMode] = useState<"landing" | "dashboard">("landing");
-  const [currentRequest, setCurrentRequest] = useState<PlanVerificationRequest | null>(null);
-  const [verificationResult, setVerificationResult] = useState<PlanVerificationResponse | null>(null);
+  // Synchronously initialize state on client to prevent landing page flash on refresh
+  const [viewMode, setViewMode] = useState<"landing" | "dashboard">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get("view");
+      if (viewParam === "dashboard") return "dashboard";
+      if (viewParam === "landing") return "landing";
+      try {
+        if (sessionStorage.getItem("cadastra_verification_result")) return "dashboard";
+      } catch {}
+    }
+    return "landing";
+  });
+
+  const [activeNavTab, setActiveNavTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab && ["carte", "investigations", "rapports", "donnees", "ia"].includes(tab)) {
+        return tab;
+      }
+    }
+    return "carte";
+  });
+
+  const [currentRequest, setCurrentRequest] = useState<PlanVerificationRequest | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem("cadastra_current_request");
+        return saved ? JSON.parse(saved) : null;
+      } catch {}
+    }
+    return null;
+  });
+
+  const [verificationResult, setVerificationResult] = useState<PlanVerificationResponse | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem("cadastra_verification_result");
+        return saved ? JSON.parse(saved) : null;
+      } catch {}
+    }
+    return null;
+  });
+
   const [selectedBorneId, setSelectedBorneId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isDossierCollapsed, setIsDossierCollapsed] = useState<boolean>(false);
 
   // Every completed audit stays in the session so investigations, reports and
   // analytics read one real, shared list instead of separate mock data.
-  const [history, setHistory] = useState<VerificationRecord[]>([]);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [isSessionRestored, setIsSessionRestored] = useState<boolean>(false);
-
-  // Check URL query parameter for direct view switching
-  React.useEffect(() => {
+  const [history, setHistory] = useState<VerificationRecord[]>(() => {
     if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const requestedView = params.get("view");
-      if (requestedView === "dashboard") {
-        setViewMode("dashboard");
-      }
-      const requestedTab = params.get("tab");
-      if (requestedTab && ["carte", "investigations", "rapports", "donnees", "ia"].includes(requestedTab)) {
-        setActiveNavTab(requestedTab);
-        setViewMode("dashboard");
-      }
+      try {
+        const saved = sessionStorage.getItem("cadastra_history");
+        return saved ? JSON.parse(saved) : [];
+      } catch {}
     }
-  }, []);
+    return [];
+  });
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Restore persisted session so page refresh never resets loaded plans and audit results
+  // Synchronize state changes to sessionStorage
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const savedRequest = sessionStorage.getItem("cadastra_current_request");
-      const savedResult = sessionStorage.getItem("cadastra_verification_result");
-      const savedHistory = sessionStorage.getItem("cadastra_history");
-      if (savedRequest) {
-        setCurrentRequest(JSON.parse(savedRequest));
-      }
-      if (savedResult) {
-        setVerificationResult(JSON.parse(savedResult));
-      }
-      if (savedHistory) {
-        setHistory(JSON.parse(savedHistory));
-      }
-    } catch (e) {
-      console.warn("Could not restore session from storage", e);
-    } finally {
-      setIsSessionRestored(true);
-    }
-  }, []);
-
-  // Persist current request & verification result across reloads (ONLY after session restoration is complete)
-  React.useEffect(() => {
-    if (typeof window === "undefined" || !isSessionRestored) return;
-    try {
       if (currentRequest) {
         sessionStorage.setItem("cadastra_current_request", JSON.stringify(currentRequest));
-      } else {
-        sessionStorage.removeItem("cadastra_current_request");
       }
     } catch {}
-  }, [currentRequest, isSessionRestored]);
+  }, [currentRequest]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined" || !isSessionRestored) return;
+    if (typeof window === "undefined") return;
     try {
       if (verificationResult) {
         sessionStorage.setItem("cadastra_verification_result", JSON.stringify(verificationResult));
-      } else {
-        sessionStorage.removeItem("cadastra_verification_result");
       }
     } catch {}
-  }, [verificationResult, isSessionRestored]);
+  }, [verificationResult]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined" || !isSessionRestored) return;
+    if (typeof window === "undefined") return;
     try {
       if (history.length > 0) {
         sessionStorage.setItem("cadastra_history", JSON.stringify(history));
       }
     } catch {}
-  }, [history, isSessionRestored]);
+  }, [history]);
 
   // Probe the real backend once so the status chip is truthful before the
   // first verification (local fallback is labelled as such, never hidden).
@@ -180,7 +184,10 @@ export default function CadastraApp() {
       result: PlanVerificationResponse,
       source: VerificationSource
     ) => {
+      setCurrentRequest(request);
       setVerificationResult(result);
+      setSelectedBorneId(null);
+      setIsDossierCollapsed(false);
       setHistory((previous) => {
         const base = {
           request,
@@ -431,6 +438,7 @@ export default function CadastraApp() {
             {/* 1. FULL-BLEED SATELLITE MAP (Foundational Canvas) */}
             <div className="absolute inset-0 z-0">
               <CadastralSatelliteMap
+                key={verificationResult?.verification_hash || currentRequest?.plan_id || "empty"}
                 planId={currentRequest?.plan_id || "En attente de plan"}
                 beacons={verificationResult?.beacons_wgs84 || []}
                 centroid={verificationResult?.centroid_wgs84}

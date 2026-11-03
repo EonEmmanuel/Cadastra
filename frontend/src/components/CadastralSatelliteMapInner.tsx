@@ -148,6 +148,15 @@ export default function CadastralSatelliteMapInner({
     setCursorCoords({ lat: centerLat, lng: centerLon });
   }, [centerLat, centerLon]);
 
+  useEffect(() => {
+    if (mapInstance && centroid) {
+      mapInstance.flyTo([centroid.latitude, centroid.longitude], 19, {
+        animate: true,
+        duration: 1.0,
+      });
+    }
+  }, [centroid?.latitude, centroid?.longitude, mapInstance]);
+
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
     try {
