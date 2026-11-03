@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -33,100 +34,125 @@ import { makeRecordId } from "@/utils/records";
 
 const API_BASE = "http://localhost:8000";
 
-export default function CadastraApp() {
-  // Synchronously initialize state on client to prevent landing page flash on refresh
+function CadastraAppContent() {
+  const searchParams = useSearchParams();
+  const urlView = searchParams.get("view");
+  const urlTab = searchParams.get("tab");
+
+  // Synchronously initialize viewMode & activeNavTab matching the URL during SSR and client hydration
   const [viewMode, setViewMode] = useState<"landing" | "dashboard">(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const viewParam = params.get("view");
-      if (viewParam === "dashboard") return "dashboard";
-      if (viewParam === "landing") return "landing";
-      try {
-        if (sessionStorage.getItem("cadastra_verification_result")) return "dashboard";
-      } catch {}
-    }
-    return "landing";
+    return urlView === "dashboard" ? "dashboard" : "landing";
   });
 
   const [activeNavTab, setActiveNavTab] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get("tab");
-      if (tab && ["carte", "investigations", "rapports", "donnees", "ia"].includes(tab)) {
-        return tab;
-      }
+    if (urlTab && ["carte", "investigations", "rapports", "donnees", "ia"].includes(urlTab)) {
+      return urlTab;
     }
     return "carte";
   });
 
-  const [currentRequest, setCurrentRequest] = useState<PlanVerificationRequest | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = sessionStorage.getItem("cadastra_current_request");
-        return saved ? JSON.parse(saved) : null;
-      } catch {}
-    }
-    return null;
-  });
-
-  const [verificationResult, setVerificationResult] = useState<PlanVerificationResponse | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = sessionStorage.getItem("cadastra_verification_result");
-        return saved ? JSON.parse(saved) : null;
-      } catch {}
-    }
-    return null;
-  });
+  // Client session state (initialized to null/empty on initial render to guarantee identical SSR & client markup)
+  const [currentRequest, setCurrentRequest] = useState<PlanVerificationRequest | null>(null);
+  const [verificationResult, setVerificationResult] = useState<PlanVerificationResponse | null>(null);
+  const [history, setHistory] = useState<VerificationRecord[]>([]);
+  const [isRestoredFromSession, setIsRestoredFromSession] = useState<boolean>(false);
 
   const [selectedBorneId, setSelectedBorneId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isDossierCollapsed, setIsDossierCollapsed] = useState<boolean>(false);
-
-  // Every completed audit stays in the session so investigations, reports and
-  // analytics read one real, shared list instead of separate mock data.
-  const [history, setHistory] = useState<VerificationRecord[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = sessionStorage.getItem("cadastra_history");
-        return saved ? JSON.parse(saved) : [];
-      } catch {}
-    }
-    return [];
-  });
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Synchronize state changes to sessionStorage
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
+  // Modals state
+  const [isAiReviewOpen, setIsAiReviewOpen] = useState(false);
+  const [pendingExtraction, setPendingExtraction] = useState<PlanVerificationRequest | null>(null);
+  const [pendingFileName, setPendingFileName] = useState<string>("");
+  const [extractionPreview, setExtractionPreview] = useState<PlanExtractionPreview | null>(null);
+
+  const [isApiSettingsOpen, setIsApiSettingsOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isCustomPlanOpen, setIsCustomPlanOpen] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiConnected, setApiConnected] = useState(false);
+
+  // Restore session data immediately after client hydration
+  useEffect(() => {
+    try {
+      const savedReq = sessionStorage.getItem("cadastra_current_request");
+      const savedRes = sessionStorage.getItem("cadastra_verification_result");
+      const savedHist = sessionStorage.getItem("cadastra_history");
+      if (savedReq) setCurrentRequest(JSON.parse(savedReq));
+      if (savedRes) setVerificationResult(JSON.parse(savedRes));
+      if (savedHist) setHistory(JSON.parse(savedHist));
+    } catch {}
+    setIsRestoredFromSession(true);
+  }, []);
+
+  // Synchronize state changes to sessionStorage only after initial session restoration
+  useEffect(() => {
+    if (!isRestoredFromSession) return;
     try {
       if (currentRequest) {
         sessionStorage.setItem("cadastra_current_request", JSON.stringify(currentRequest));
+      } else {
+        sessionStorage.removeItem("cadastra_current_request");
       }
     } catch {}
-  }, [currentRequest]);
+  }, [currentRequest, isRestoredFromSession]);
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (!isRestoredFromSession) return;
     try {
       if (verificationResult) {
         sessionStorage.setItem("cadastra_verification_result", JSON.stringify(verificationResult));
+      } else {
+        sessionStorage.removeItem("cadastra_verification_result");
       }
     } catch {}
-  }, [verificationResult]);
+  }, [verificationResult, isRestoredFromSession]);
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (!isRestoredFromSession) return;
     try {
       if (history.length > 0) {
         sessionStorage.setItem("cadastra_history", JSON.stringify(history));
       }
     } catch {}
-  }, [history]);
+  }, [history, isRestoredFromSession]);
 
-  // Probe the real backend once so the status chip is truthful before the
-  // first verification (local fallback is labelled as such, never hidden).
-  React.useEffect(() => {
+  // Keep the URL shareable, back/forward friendly, and refresh-safe
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (viewMode === "dashboard") {
+      params.set("view", "dashboard");
+      params.set("tab", activeNavTab);
+    } else {
+      params.delete("view");
+      params.delete("tab");
+    }
+    const query = params.toString();
+    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    window.history.replaceState(null, "", newUrl);
+  }, [viewMode, activeNavTab]);
+
+  // Support browser Back/Forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get("view");
+      const t = params.get("tab");
+      setViewMode(v === "dashboard" ? "dashboard" : "landing");
+      if (t && ["carte", "investigations", "rapports", "donnees", "ia"].includes(t)) {
+        setActiveNavTab(t);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Probe backend health once
+  useEffect(() => {
     let cancelled = false;
     const check = () => {
       fetch(`${API_BASE}/health`)
@@ -144,39 +170,6 @@ export default function CadastraApp() {
       window.removeEventListener("focus", check);
     };
   }, []);
-
-  // Keep the URL shareable and refresh-safe: the active workspace is encoded
-  // in the query string instead of living only in React state.
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (viewMode === "dashboard") {
-      params.set("view", "dashboard");
-      params.set("tab", activeNavTab);
-    } else {
-      params.delete("view");
-      params.delete("tab");
-    }
-    const query = params.toString();
-    window.history.replaceState(
-      null,
-      "",
-      query ? `${window.location.pathname}?${query}` : window.location.pathname
-    );
-  }, [viewMode, activeNavTab]);
-
-  // Modals state
-  const [isAiReviewOpen, setIsAiReviewOpen] = useState(false);
-  const [pendingExtraction, setPendingExtraction] = useState<PlanVerificationRequest | null>(null);
-  const [pendingFileName, setPendingFileName] = useState<string>("");
-  const [extractionPreview, setExtractionPreview] = useState<PlanExtractionPreview | null>(null);
-
-  const [isApiSettingsOpen, setIsApiSettingsOpen] = useState(false);
-  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
-  const [isCustomPlanOpen, setIsCustomPlanOpen] = useState(false);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [apiConnected, setApiConnected] = useState(false);
 
   const commitVerification = useCallback(
     (
@@ -209,6 +202,7 @@ export default function CadastraApp() {
   const runVerification = useCallback(
     async (requestToVerify: PlanVerificationRequest, source: VerificationSource = "manual") => {
       setIsLoading(true);
+      setSelectedBorneId(null);
       try {
         const res = await fetch(`${API_BASE}/api/verify`, {
           method: "POST",
@@ -223,8 +217,8 @@ export default function CadastraApp() {
         } else {
           throw new Error(`API Error: ${res.statusText}`);
         }
-      } catch {
-        // Local geodetic Gauss-Shoelace & Snyder projection fallback
+      } catch (err) {
+        console.warn("API verify failed, running local Snyder fallback", err);
         const localResult = verifyCadastralPlanLocally({
           plan_id: requestToVerify.plan_id,
           stated_area_sqm: requestToVerify.stated_area_sqm,
@@ -243,7 +237,7 @@ export default function CadastraApp() {
   );
 
   // Auto-load profile or sample parcel if requested in query parameters
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const requestedProfile = params.get("profile") || params.get("sample");
@@ -252,10 +246,11 @@ export default function CadastraApp() {
         .then((r) => (r.ok ? r.json() : null))
         .then((plan) => {
           if (plan) {
+            setVerificationResult(null);
             setCurrentRequest(plan);
-            runVerification(plan, "dataset");
             setViewMode("dashboard");
             setActiveNavTab("carte");
+            runVerification(plan, "dataset");
           }
         })
         .catch(() => {});
@@ -263,18 +258,17 @@ export default function CadastraApp() {
   }, [runVerification]);
 
   // When a plan is uploaded or submitted from the Landing Hero:
-  // Open the Human-in-the-Loop AI Vision Review Modal first for uploads,
-  // or jump directly to the geodetic map for sample test profiles.
   const handlePlanLoadedFromHero = (
     plan: PlanVerificationRequest,
     fileName: string,
     preview: PlanExtractionPreview | null
   ) => {
     if (!preview) {
+      setVerificationResult(null);
       setCurrentRequest(plan);
-      runVerification(plan, "dataset");
       setViewMode("dashboard");
       setActiveNavTab("carte");
+      runVerification(plan, "dataset");
       return;
     }
     setPendingExtraction(plan);
@@ -285,28 +279,33 @@ export default function CadastraApp() {
 
   // When human validates the coordinates in the AI Review Modal:
   const handleConfirmAiReview = (confirmedPlan: PlanVerificationRequest) => {
+    setVerificationResult(null);
     setCurrentRequest(confirmedPlan);
     setIsAiReviewOpen(false);
-    runVerification(confirmedPlan, "upload");
+    setPendingExtraction(null);
+    setExtractionPreview(null);
     setViewMode("dashboard");
     setActiveNavTab("carte");
+    runVerification(confirmedPlan, "upload");
   };
 
   // Custom Plan Submit Handler (Direct Manual Input)
   const handleCustomPlanSubmit = (customPlan: PlanVerificationRequest) => {
+    setVerificationResult(null);
     setCurrentRequest(customPlan);
     setIsCustomPlanOpen(false);
-    runVerification(customPlan, "manual");
     setViewMode("dashboard");
     setActiveNavTab("carte");
+    runVerification(customPlan, "manual");
   };
 
   // Load a ground-truth profile from the backend's /api/profiles endpoint
   const handleLoadProfile = (plan: PlanVerificationRequest) => {
+    setVerificationResult(null);
     setCurrentRequest(plan);
-    runVerification(plan, "dataset");
     setViewMode("dashboard");
     setActiveNavTab("carte");
+    runVerification(plan, "dataset");
   };
 
   const openRecord = (record: VerificationRecord) => {
@@ -340,18 +339,17 @@ export default function CadastraApp() {
         a.download = `Cadastra_Cameroon_Audit_${target.plan_id}.pdf`;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
         a.remove();
-      } else {
-        alert("Erreur lors de la génération du rapport PDF.");
+        window.URL.revokeObjectURL(url);
       }
-    } catch {
-      alert("Impossible de joindre le serveur pour le téléchargement PDF.");
+    } catch (e) {
+      console.error("PDF download failed", e);
     } finally {
       setDownloadingId(null);
     }
   };
 
+  // Render secondary workspaces based on active sidebar tab
   const renderWorkspace = () => {
     switch (activeNavTab) {
       case "investigations":
@@ -517,8 +515,28 @@ export default function CadastraApp() {
                   </button>
                 )}
 
+                {/* Loading Indicator Overlay */}
+                {isLoading && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center p-4 pointer-events-none">
+                    <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#040711]/90 border border-white/[0.12] backdrop-blur-xl shadow-2xl text-xs font-mono text-zinc-200">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#60A5FA] animate-ping" />
+                      <span>Calcul géodésique Gauss-Shoelace et projection WGS84 en cours...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Session Restoring Placeholder */}
+                {!isRestoredFromSession && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center p-4 pointer-events-none">
+                    <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#090B10]/80 border border-white/[0.08] backdrop-blur-md text-xs font-mono text-zinc-400">
+                      <span className="w-2 h-2 rounded-full bg-[#60A5FA] animate-ping" />
+                      <span>Initialisation de la session géodésique...</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Empty State Overlay */}
-                {!verificationResult && !isLoading && !isCustomPlanOpen && (
+                {isRestoredFromSession && !verificationResult && !isLoading && !isCustomPlanOpen && (
                   <div
                     className="absolute inset-0 z-10 flex items-center justify-center p-4 pointer-events-none transition-all duration-300"
                     style={{
@@ -621,5 +639,22 @@ export default function CadastraApp() {
         onSubmit={handleCustomPlanSubmit}
       />
     </div>
+  );
+}
+
+export default function CadastraApp() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#03060E] text-zinc-400 font-mono text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#60A5FA] animate-ping" />
+            <span>Initialisation du terminal géodésique...</span>
+          </div>
+        </div>
+      }
+    >
+      <CadastraAppContent />
+    </Suspense>
   );
 }
