@@ -521,9 +521,9 @@ export default function LandingHero({
             whileTap={{ scale: 0.96 }}
             type="button"
             onClick={onOpenDashboard}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/[0.12] backdrop-blur-md transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-medium bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/[0.12] backdrop-blur-md transition-all active:scale-95 shrink-0 whitespace-nowrap"
           >
-            <span>{t.navDashboard}</span>
+            <span className="whitespace-nowrap shrink-0">{t.navDashboard}</span>
           </motion.button>
         </div>
       </header>
@@ -677,7 +677,7 @@ export default function LandingHero({
           </AnimatePresence>
 
           {/* Bottom controls row */}
-          <div className="mt-5 pt-3.5 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200/90">
+          <div className="mt-5 pt-3.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 border-t border-zinc-200/90">
             <div className="flex flex-wrap items-center gap-2">
               {/* Image picker */}
               <motion.button
@@ -686,10 +686,10 @@ export default function LandingHero({
                 type="button"
                 onClick={() => imageInputRef.current?.click()}
                 disabled={isProcessing}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50 shrink-0 whitespace-nowrap"
               >
-                <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                <span>{t.btnImagePicker}</span>
+                <ImageIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="whitespace-nowrap shrink-0">{t.btnImagePicker}</span>
               </motion.button>
 
               {/* PDF picker */}
@@ -699,10 +699,10 @@ export default function LandingHero({
                 type="button"
                 onClick={() => pdfInputRef.current?.click()}
                 disabled={isProcessing}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50 shrink-0 whitespace-nowrap"
               >
-                <FileText className="w-3.5 h-3.5 text-red-600" />
-                <span>{t.btnPdfPicker}</span>
+                <FileText className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                <span className="whitespace-nowrap shrink-0">{t.btnPdfPicker}</span>
               </motion.button>
 
               {/* WhatsApp */}
@@ -711,10 +711,10 @@ export default function LandingHero({
                 whileTap={{ scale: 0.97 }}
                 type="button"
                 onClick={onOpenWhatsAppModal}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition shrink-0 whitespace-nowrap"
               >
-                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{t.navWhatsApp}</span>
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="whitespace-nowrap shrink-0">{t.navWhatsApp}</span>
               </motion.button>
 
               {/* Manual entry */}
@@ -723,10 +723,10 @@ export default function LandingHero({
                 whileTap={{ scale: 0.97 }}
                 type="button"
                 onClick={onOpenManualModal}
-                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition shrink-0 whitespace-nowrap"
               >
-                <Compass className="w-3.5 h-3.5 text-zinc-600" />
-                <span>{t.btnManualInput}</span>
+                <Compass className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                <span className="whitespace-nowrap shrink-0">{t.btnManualInput}</span>
               </motion.button>
             </div>
 
@@ -737,17 +737,17 @@ export default function LandingHero({
               type="button"
               onClick={handlePromptSubmit}
               disabled={isProcessing}
-              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-full text-xs sm:text-sm font-semibold bg-[#0B0F19] hover:bg-black text-white shadow-md shadow-black/25 transition-all active:scale-95 disabled:opacity-50 shrink-0"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-md text-xs sm:text-sm font-medium bg-[#0B0F19] hover:bg-black text-white shadow-md shadow-black/25 transition-all active:scale-95 disabled:opacity-50 shrink-0 whitespace-nowrap ml-auto sm:ml-0"
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  <span>{t.btnAnalyzing}</span>
+                  <Loader2 className="w-4 h-4 text-white animate-spin shrink-0" />
+                  <span className="whitespace-nowrap shrink-0">{t.btnAnalyzing}</span>
                 </>
               ) : (
                 <>
-                  <span>{t.btnAuditSubmit}</span>
-                  <ArrowUp className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+                  <span className="whitespace-nowrap shrink-0">{t.btnAuditSubmit}</span>
+                  <ArrowUp className="w-3.5 h-3.5 text-white stroke-[2.5] shrink-0" />
                 </>
               )}
             </motion.button>

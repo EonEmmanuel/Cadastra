@@ -742,20 +742,20 @@ export default function ForensicDossierPanel({
                   }}
                   placeholder={t.aiAskPlaceholder}
                   disabled={isAskingAi}
-                  className="flex-1 bg-[#10141D] border border-white/[0.08] rounded-md px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 transition disabled:opacity-50"
+                  className="flex-1 min-w-0 bg-[#10141D] border border-white/[0.08] rounded-md px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-white/30 transition disabled:opacity-50"
                 />
                 <button
                   type="button"
                   onClick={() => handleAskQuestion()}
                   disabled={isAskingAi || !customQuestion.trim()}
-                  className="px-3.5 py-2 rounded-md bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-medium transition disabled:opacity-40 flex items-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm active:scale-[0.98]"
+                  className="px-3.5 py-2 rounded-md bg-white hover:bg-zinc-200 text-zinc-950 text-xs font-medium transition disabled:opacity-40 flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap shadow-sm active:scale-[0.98]"
                 >
                   {isAskingAi ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-950" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-950 shrink-0" />
                   ) : (
-                    <Send className="w-3.5 h-3.5" />
+                    <Send className="w-3.5 h-3.5 shrink-0" />
                   )}
-                  <span>
+                  <span className="whitespace-nowrap shrink-0">
                     {isAskingAi ? t.askingAi : t.btnAskAi}
                   </span>
                 </button>
