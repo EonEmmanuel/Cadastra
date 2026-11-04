@@ -852,7 +852,7 @@ export default function ForensicDossierPanel({
       {/* 3. BOTTOM ACTION BUTTONS */}
       <div className="p-3 sm:p-4 pt-3 flex flex-wrap sm:flex-nowrap items-center gap-2 border-t border-white/[0.08] bg-[#0B0E14]">
         <a
-          href={`/api/report/pdf?plan_id=${encodeURIComponent(request?.plan_id || "plan")}&disposition=attachment`}
+          href={`/api/report/pdf?plan_id=${encodeURIComponent(request?.plan_id || "plan")}&disposition=attachment&language=${language}`}
           download={`Cadastra_Cameroon_Audit_${(request?.plan_id || "plan").replace(/[^a-zA-Z0-9_\-\.]/g, "_")}.pdf`}
           onClick={() => {
             setIsLocalDownloading(true);
@@ -876,7 +876,7 @@ export default function ForensicDossierPanel({
 
         <div className="flex items-center gap-1.5 shrink-0">
           <a
-            href={`/api/report/pdf?plan_id=${encodeURIComponent(request?.plan_id || "plan")}&disposition=inline`}
+            href={`/api/report/pdf?plan_id=${encodeURIComponent(request?.plan_id || "plan")}&disposition=inline&language=${language}`}
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 sm:p-2.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white text-xs font-medium transition flex items-center justify-center border border-white/[0.08] whitespace-nowrap active:scale-[0.98]"

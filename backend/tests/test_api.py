@@ -133,11 +133,24 @@ def test_api_generate_pdf_report(client):
 
 
 def test_api_get_pdf_report_by_query(client):
-    """GET /api/report/pdf?plan_id=... should return 200 and PDF stream."""
-    response = client.get("/api/report/pdf?plan_id=DLA-YAS-2024-001")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "application/pdf"
-    assert response.content[:4] == b"%PDF"
+    """GET /api/report/pdf?plan_id=... should return 200 and PDF stream with language options."""
+    # Bilingual default
+    resp_bilingual = client.get("/api/report/pdf?plan_id=DLA-YAS-2024-001&language=bilingual")
+    assert resp_bilingual.status_code == 200
+    assert resp_bilingual.headers["content-type"] == "application/pdf"
+    assert resp_bilingual.content[:4] == b"%PDF"
+
+    # English edition
+    resp_en = client.get("/api/report/pdf?plan_id=DLA-YAS-2024-001&language=en")
+    assert resp_en.status_code == 200
+    assert resp_en.headers["content-type"] == "application/pdf"
+    assert resp_en.content[:4] == b"%PDF"
+
+    # French edition
+    resp_fr = client.get("/api/report/pdf?plan_id=DLA-YAS-2024-001&language=fr")
+    assert resp_fr.status_code == 200
+    assert resp_fr.headers["content-type"] == "application/pdf"
+    assert resp_fr.content[:4] == b"%PDF"
 
 
 def test_api_get_pdf_report_by_path(client):

@@ -454,8 +454,12 @@ def _find_plan_by_id(query: str, prefer_fraud: bool = False) -> Optional[PlanVer
 
 
 @app.post("/api/report/pdf")
-def generate_pdf_report(request: PlanVerificationRequest, disposition: str = Query("attachment")):
-    """Generate and download official bilingual PDF cadastral audit report (POST with body)."""
+def generate_pdf_report(
+    request: PlanVerificationRequest,
+    disposition: str = Query("attachment"),
+    language: str = Query("bilingual", description="Report language: 'bilingual', 'en', or 'fr'"),
+):
+    """Generate and download official PDF cadastral audit report (Bilingual, English, or French)."""
     try:
         if not request.plan_id:
             request.plan_id = f"PLAN-{uuid.uuid4().hex[:8].upper()}"
@@ -464,7 +468,7 @@ def generate_pdf_report(request: PlanVerificationRequest, disposition: str = Que
         RECENT_VERIFIED_PLANS[clean_id] = request
         _save_plan_to_disk(request)
         verification_result = engine.verify_plan(request)
-        pdf_bytes = generate_cadastral_pdf(verification_result, request)
+        pdf_bytes = generate_cadastral_pdf(verification_result, request, language=language)
         safe_plan_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id or "plan")
         filename = f"Cadastra_Cameroon_Audit_{safe_plan_id}.pdf"
         disp_type = "inline" if disposition.lower() == "inline" else "attachment"
@@ -485,25 +489,27 @@ def generate_pdf_report(request: PlanVerificationRequest, disposition: str = Que
 def get_pdf_report_by_query(
     plan_id: str = Query("douala_yassa_utm32n.json", description="ID du plan ou nom du profil"),
     disposition: str = Query("attachment", description="inline ou attachment"),
+    language: str = Query("bilingual", description="Report language: 'bilingual', 'en', or 'fr'"),
 ):
     """Download official PDF cadastral report via GET query parameter."""
     plan_req = _find_plan_by_id(plan_id)
     if not plan_req:
         raise HTTPException(status_code=404, detail=f"Dossier cadastral {plan_id} introuvable.")
 
-    return generate_pdf_report(plan_req, disposition=disposition)
+    return generate_pdf_report(plan_req, disposition=disposition, language=language)
 
 
 @app.head("/api/report/pdf")
 def head_pdf_report_by_query(
     plan_id: str = Query("douala_yassa_utm32n.json", description="ID du plan ou nom du profil"),
     disposition: str = Query("attachment", description="inline ou attachment"),
+    language: str = Query("bilingual", description="Report language: 'bilingual', 'en', or 'fr'"),
 ):
     """Support HTTP HEAD requests for download managers and Chromium probes."""
     plan_req = _find_plan_by_id(plan_id)
     if not plan_req:
         raise HTTPException(status_code=404, detail=f"Dossier cadastral {plan_id} introuvable.")
-    resp = generate_pdf_report(plan_req, disposition=disposition)
+    resp = generate_pdf_report(plan_req, disposition=disposition, language=language)
     return Response(
         content=b"",
         status_code=200,
@@ -513,9 +519,13 @@ def head_pdf_report_by_query(
 
 
 @app.get("/api/report/pdf/{plan_id}")
-def get_pdf_report_by_path(plan_id: str, disposition: str = Query("attachment")):
+def get_pdf_report_by_path(
+    plan_id: str,
+    disposition: str = Query("attachment"),
+    language: str = Query("bilingual", description="Report language: 'bilingual', 'en', or 'fr'"),
+):
     """Download official PDF cadastral report via GET path parameter."""
-    return get_pdf_report_by_query(plan_id=plan_id, disposition=disposition)
+    return get_pdf_report_by_query(plan_id=plan_id, disposition=disposition, language=language)
 
 
 @app.get("/api/profiles")

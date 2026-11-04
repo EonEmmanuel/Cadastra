@@ -1,0 +1,50 @@
+{
+  "plan_id": "TF n° 9283/MAF",
+  "title_number": null,
+  "owner_name": null,
+  "locality": "Ebang I, Soa",
+  "region": "Centre",
+  "division": null,
+  "surveyor_name": null,
+  "surveyor_order_number": null,
+  "utm_zone": "32N",
+  "stated_area_sqm": 2957.0,
+  "date_surveyed": null,
+  "beacons": [
+    {
+      "borne_id": "B.1",
+      "x": 784082.65,
+      "y": 443645.2,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B.2",
+      "x": 784116.36,
+      "y": 443586.33,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B.3",
+      "x": 784079.85,
+      "y": 443565.43,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B.4",
+      "x": 784046.7,
+      "y": 443623.32,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B.5",
+      "x": 784059.37,
+      "y": 443638.07,
+      "z": null,
+      "description": null
+    }
+  ]
+}

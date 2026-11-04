@@ -73,12 +73,14 @@ class NumberedCanvas(canvas.Canvas):
 def generate_cadastral_pdf(
     result: PlanVerificationResponse,
     request: PlanVerificationRequest,
+    language: str = "bilingual",
 ) -> bytes:
-    """Generate a bilingual Cameroon Cadastral Audit Certificate in PDF format.
+    """Generate an official Cameroon Cadastral Audit Certificate in PDF format (Bilingual, English, or French).
 
     Args:
         result: The PlanVerificationResponse from the CadastralEngine.
         request: The PlanVerificationRequest input metadata.
+        language: Language preference ('bilingual', 'en', or 'fr').
 
     Returns:
         bytes: Raw PDF binary stream.
@@ -223,18 +225,33 @@ def generate_cadastral_pdf(
     )
 
     # 3. Document Title
-    story.append(
-        Paragraph(
-            "RAPPORT D'AUDIT GÉOMÉTRIQUE & CERTIFICAT DE CONFORMITÉ CADASTRALE",
-            title_style,
+    lang = (language or "bilingual").strip().lower()
+    if lang == "en":
+        story.append(
+            Paragraph(
+                "CADASTRAL GEODETIC AUDIT REPORT & SURFACE COMPLIANCE CERTIFICATE",
+                title_style,
+            )
         )
-    )
-    story.append(
-        Paragraph(
-            "CADASTRAL GEODETIC AUDIT REPORT & SURFACE COMPLIANCE CERTIFICATE",
-            subtitle_style,
+        story.append(
+            Paragraph(
+                "RAPPORT D'AUDIT GÉOMÉTRIQUE & CERTIFICAT DE CONFORMITÉ CADASTRALE",
+                subtitle_style,
+            )
         )
-    )
+    else:
+        story.append(
+            Paragraph(
+                "RAPPORT D'AUDIT GÉOMÉTRIQUE & CERTIFICAT DE CONFORMITÉ CADASTRALE",
+                title_style,
+            )
+        )
+        story.append(
+            Paragraph(
+                "CADASTRAL GEODETIC AUDIT REPORT & SURFACE COMPLIANCE CERTIFICATE",
+                subtitle_style,
+            )
+        )
     story.append(Spacer(1, 8))
 
     # 4. Status Verdict Banner
@@ -458,32 +475,61 @@ def generate_cadastral_pdf(
     story.append(Spacer(1, 10))
 
     # 8. Fraud Indicators & Legal Recommendations
-    story.append(
-        Paragraph("3. INDICATEURS D'ANOMALIE & AVIS TECHNIQUE / LEGAL ADVISORY", section_heading)
-    )
+    sec3_heading = "3. INDICATEURS D'ANOMALIE & AVIS TECHNIQUE / LEGAL ADVISORY"
+    if lang == "en":
+        sec3_heading = "3. ANOMALY INDICATORS & TECHNICAL / LEGAL ADVISORY"
+    elif lang == "fr":
+        sec3_heading = "3. INDICATEURS D'ANOMALIE & AVIS TECHNIQUE ET JURIDIQUE"
+    story.append(Paragraph(sec3_heading, section_heading))
 
     indicators_text = ""
     if result.fraud_indicators:
         for ind in result.fraud_indicators:
-            indicators_text += f"• <font color='#CE1126'><b>[ANOMALIE]</b></font> {ind}<br/>"
+            prefix = "[ANOMALIE / ANOMALY]" if lang == "bilingual" else ("[ANOMALY]" if lang == "en" else "[ANOMALIE]")
+            indicators_text += f"• <font color='#CE1126'><b>{prefix}</b></font> {ind}<br/>"
     else:
-        indicators_text = "• <font color='#007A3D'><b>[AUCUNE ANOMALIE]</b></font> Aucune falsification de coordonnées ni superficie fictive détectée."
+        if lang == "en":
+            indicators_text = "• <font color='#007A3D'><b>[NO ANOMALIES]</b></font> No coordinate falsification or fictitious surface detected."
+        elif lang == "fr":
+            indicators_text = "• <font color='#007A3D'><b>[AUCUNE ANOMALIE]</b></font> Aucune falsification de coordonnées ni superficie fictive détectée."
+        else:
+            indicators_text = "• <font color='#007A3D'><b>[CONFORME / COMPLIANT]</b></font> Aucune falsification détectée · No boundary or area falsification detected."
 
     recomms_text = ""
-    for r in result.recommendations_fr:
-        recomms_text += f"• {r}<br/>"
+    if lang == "en":
+        en_list = result.recommendations_en if result.recommendations_en else result.recommendations_fr
+        for r in en_list:
+            recomms_text += f"• {r}<br/>"
+    elif lang == "fr":
+        for r in result.recommendations_fr:
+            recomms_text += f"• {r}<br/>"
+    else:
+        # Bilingual: display both French and English legal advisories
+        if result.recommendations_fr:
+            recomms_text += "<b>[FR] Recommandations Administratives :</b><br/>"
+            for r in result.recommendations_fr:
+                recomms_text += f"• {r}<br/>"
+        if result.recommendations_en:
+            if result.recommendations_fr:
+                recomms_text += "<br/>"
+            recomms_text += "<b>[EN] Official Legal Advisory & Due Diligence :</b><br/>"
+            for r in result.recommendations_en:
+                recomms_text += f"• {r}<br/>"
+
+    advisory_label_anomaly = "<b>Detected Anomalies :</b>" if lang == "en" else ("<b>Anomalies Détectées :</b>" if lang == "fr" else "<b>Anomalies Détectées / Anomalies :</b>")
+    advisory_label_recomms = "<b>Legal Advisory :</b>" if lang == "en" else ("<b>Recommandations :</b>" if lang == "fr" else "<b>Recommandations / Recommendations :</b>")
 
     advisory_data = [
         [
-            Paragraph("<b>Anomalies Détectées :</b>", bold_label),
+            Paragraph(advisory_label_anomaly, bold_label),
             Paragraph(indicators_text, body_style),
         ],
         [
-            Paragraph("<b>Recommandations :</b>", bold_label),
+            Paragraph(advisory_label_recomms, bold_label),
             Paragraph(recomms_text, body_style),
         ],
     ]
-    advisory_table = Table(advisory_data, colWidths=[120, 403])
+    advisory_table = Table(advisory_data, colWidths=[130, 393])
     advisory_table.setStyle(
         TableStyle(
             [
