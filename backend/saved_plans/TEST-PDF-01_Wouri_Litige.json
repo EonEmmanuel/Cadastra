@@ -1,0 +1,43 @@
+{
+  "plan_id": "TEST-PDF-01/Wouri:Litige",
+  "title_number": "TF 5555/Wouri",
+  "owner_name": "Test Owner",
+  "locality": "Douala - Bonapriso",
+  "region": "Littoral",
+  "division": null,
+  "surveyor_name": "Ing. Test",
+  "surveyor_order_number": "OGEC-999",
+  "utm_zone": "32N",
+  "stated_area_sqm": 980.0,
+  "date_surveyed": null,
+  "beacons": [
+    {
+      "borne_id": "B1",
+      "x": 583420.0,
+      "y": 446100.0,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B2",
+      "x": 583455.0,
+      "y": 446100.0,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B3",
+      "x": 583455.0,
+      "y": 446072.0,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B4",
+      "x": 583420.0,
+      "y": 446072.0,
+      "z": null,
+      "description": null
+    }
+  ]
+}

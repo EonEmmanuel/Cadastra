@@ -12,6 +12,7 @@ import {
   Copy,
   Ruler,
   Compass,
+  ExternalLink,
 } from "lucide-react";
 import {
   PlanVerificationResponse,
@@ -421,17 +422,25 @@ export default function ForensicDossierPanel({
 
       {/* 3. BOTTOM ACTION BUTTONS */}
       <div className="p-4 sm:p-5 pt-3 flex items-center gap-2.5 border-t border-white/[0.06] bg-[#040711]">
-        <button
-          type="button"
-          onClick={onDownloadPdf}
-          disabled={isDownloadingPdf}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-semibold text-xs tracking-tight transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+        <a
+          href={`/api/report/pdf?plan_id=${encodeURIComponent(request?.plan_id || "plan")}&disposition=attachment`}
+          download={`Cadastra_Cameroon_Audit_${(request?.plan_id || "plan").replace(/[^a-zA-Z0-9_\-\.]/g, "_")}.pdf`}
+          className="flex-1 px-4 py-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-semibold text-xs tracking-tight transition shadow-md flex items-center justify-center gap-2"
         >
           <Download className="w-4 h-4 text-zinc-950" />
-          <span>
-            {isDownloadingPdf ? "Génération..." : "Télécharger le rapport d'audit"}
-          </span>
-        </button>
+          <span>{"Télécharger le rapport d'audit"}</span>
+        </a>
+
+        <a
+          href={`/api/report/pdf?plan_id=${encodeURIComponent(request?.plan_id || "plan")}&disposition=inline`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3.5 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-zinc-200 text-xs font-medium transition flex items-center gap-1.5 border border-white/[0.08]"
+          title="Ouvrir le certificat PDF dans un nouvel onglet"
+        >
+          <ExternalLink className="w-4 h-4 text-zinc-300" />
+          <span className="hidden sm:inline">Aperçu</span>
+        </a>
 
         <button
           type="button"

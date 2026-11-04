@@ -62,10 +62,10 @@ class NumberedCanvas(canvas.Canvas):
         self.saveState()
         self.setFont("Helvetica", 7.5)
         self.setFillColor(TEXT_MUTED)
-        # Footer text
-        footer_left = f"Cadastra-Cameroon · MINDCAF (Ord. 74-1 / Décret 76-165) · Page {self._pageNumber} sur {page_count}"
+        # Footer text - ASCII-clean to avoid Type 1 font encoding errors in PDF viewers
+        footer_left = f"Cadastra-Cameroon - MINDCAF (Ord. 74-1 / Decret 76-165) - Page {self._pageNumber} sur {page_count}"
         self.drawString(36, 16, footer_left)
-        footer_right = "Certificat Géodésique Sécurisé · Empreinte SHA-256"
+        footer_right = "Certificat Geodesique Securise - Empreinte SHA-256"
         self.drawRightString(595 - 36, 16, footer_right)
         self.restoreState()
 

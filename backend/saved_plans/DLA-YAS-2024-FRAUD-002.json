@@ -1,0 +1,43 @@
+{
+  "plan_id": "DLA-YAS-2024-FRAUD-002",
+  "title_number": "TF 48291/Wouri-LITIGE",
+  "owner_name": "Société Immobilière Fictive du Wouri SARL",
+  "locality": "Douala - Yassa",
+  "region": "Littoral",
+  "division": "Wouri",
+  "surveyor_name": "Cabinet Faux-Bornage / Non Enregistré",
+  "surveyor_order_number": "OGEC-INCONNU",
+  "utm_zone": "32N",
+  "stated_area_sqm": 1500.0,
+  "date_surveyed": "2024-04-10",
+  "beacons": [
+    {
+      "borne_id": "B1",
+      "x": 583420.0,
+      "y": 446100.0,
+      "z": 24.5,
+      "description": "Borne d'angle Nord-Ouest"
+    },
+    {
+      "borne_id": "B2",
+      "x": 583455.0,
+      "y": 446100.0,
+      "z": 24.8,
+      "description": "Borne d'angle Nord-Est"
+    },
+    {
+      "borne_id": "B3",
+      "x": 583455.0,
+      "y": 446072.0,
+      "z": 25.1,
+      "description": "Borne d'angle Sud-Est"
+    },
+    {
+      "borne_id": "B4",
+      "x": 583420.0,
+      "y": 446072.0,
+      "z": 24.9,
+      "description": "Borne d'angle Sud-Ouest"
+    }
+  ]
+}

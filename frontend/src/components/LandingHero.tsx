@@ -20,6 +20,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { PlanVerificationRequest, PlanExtractionPreview } from "@/types/cadastre";
+import { apiFetch } from "@/utils/api";
 
 interface LandingHeroProps {
   onPlanLoaded: (
@@ -164,7 +165,7 @@ export default function LandingHero({
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("http://localhost:8000/api/extract", {
+      const res = await apiFetch("/api/extract", {
         method: "POST",
         body: formData,
       });
@@ -359,9 +360,7 @@ export default function LandingHero({
     setIsProcessing(true);
     setExtractError(null);
     try {
-      const res = await fetch(
-        `http://localhost:8000/api/profiles/${profileName}`
-      );
+      const res = await apiFetch(`/api/profiles/${profileName}`);
       if (res.ok) {
         const plan = await res.json();
         onPlanLoaded(plan, profileName, null);

@@ -154,15 +154,14 @@ export default function ReportsWorkspace({
                     >
                       Voir le dossier
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onDownload(record)}
-                      disabled={isDownloading}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    <a
+                      href={`/api/report/pdf?plan_id=${encodeURIComponent(record.request.plan_id || record.id)}&disposition=attachment`}
+                      download={`Cadastra_Cameroon_Audit_${(record.request.plan_id || record.id).replace(/[^a-zA-Z0-9_\-\.]/g, "_")}.pdf`}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      {isDownloading ? "Génération…" : "PDF bilingue"}
-                    </button>
+                      <span>PDF bilingue</span>
+                    </a>
                   </div>
                 </div>
               </div>

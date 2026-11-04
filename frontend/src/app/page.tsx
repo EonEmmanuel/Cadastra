@@ -31,8 +31,7 @@ import {
 } from "@/types/cadastre";
 import { verifyCadastralPlanLocally } from "@/utils/geodesy";
 import { makeRecordId } from "@/utils/records";
-
-const API_BASE = "http://localhost:8000";
+import { API_BASE, apiFetch } from "@/utils/api";
 
 function CadastraAppContent() {
   const searchParams = useSearchParams();
@@ -155,7 +154,7 @@ function CadastraAppContent() {
   useEffect(() => {
     let cancelled = false;
     const check = () => {
-      fetch(`${API_BASE}/health`)
+      apiFetch("/health")
         .then((response) => {
           if (!cancelled) setApiConnected(response.ok);
         })
@@ -204,7 +203,7 @@ function CadastraAppContent() {
       setIsLoading(true);
       setSelectedBorneId(null);
       try {
-        const res = await fetch(`${API_BASE}/api/verify`, {
+        const res = await apiFetch("/api/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestToVerify),
@@ -242,7 +241,7 @@ function CadastraAppContent() {
     const params = new URLSearchParams(window.location.search);
     const requestedProfile = params.get("profile") || params.get("sample");
     if (requestedProfile) {
-      fetch(`${API_BASE}/api/profiles/${requestedProfile}`)
+      apiFetch(`/api/profiles/${requestedProfile}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((plan) => {
           if (plan) {
@@ -316,8 +315,8 @@ function CadastraAppContent() {
     setViewMode("dashboard");
   };
 
-  // PDF Report Download Handler
-  const handleDownloadPdf = async (
+  // PDF Report Download Handler - Direct Native HTTP Stream (zero fetch, zero extension interception)
+  const handleDownloadPdf = (
     requestOverride?: PlanVerificationRequest | null,
     recordId?: string
   ) => {
@@ -325,27 +324,39 @@ function CadastraAppContent() {
     if (!target) return;
     setDownloadingId(recordId ?? "current");
     try {
-      const res = await fetch(`${API_BASE}/api/report/pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(target),
-      });
+      const safeId = (target.plan_id || "plan").replace(/[^a-zA-Z0-9_\-\.]/g, "_");
+      const filename = `Cadastra_Cameroon_Audit_${safeId}.pdf`;
+      const downloadUrl = `/api/report/pdf?plan_id=${encodeURIComponent(target.plan_id || "plan")}&disposition=attachment`;
 
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `Cadastra_Cameroon_Audit_${target.plan_id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        try {
+          if (document.body.contains(a)) {
+            document.body.removeChild(a);
+          }
+        } catch {
+          // ignore cleanup errors
+        }
+        setDownloadingId(null);
+      }, 3000);
+    } catch (e: any) {
+      console.error("PDF download initiation failed:", e);
+      try {
+        const fallbackUrl = `/api/report/pdf?plan_id=${encodeURIComponent(target.plan_id || "plan")}&disposition=inline`;
+        window.open(fallbackUrl, "_blank");
+      } catch {
+        alert(
+          `Échec du téléchargement du certificat PDF : ${e?.message || "Erreur de connexion"}`
+        );
+      } finally {
+        setDownloadingId(null);
       }
-    } catch (e) {
-      console.error("PDF download failed", e);
-    } finally {
-      setDownloadingId(null);
     }
   };
 

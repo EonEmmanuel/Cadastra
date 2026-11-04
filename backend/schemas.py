@@ -44,16 +44,16 @@ class BoundarySegment(BaseModel):
 
 
 class PlanVerificationRequest(BaseModel):
-    plan_id: str = Field(..., description="Identifiant unique du dossier ou plan")
+    plan_id: str = Field("PLAN-SANS-ID", description="Identifiant unique du dossier ou plan")
     title_number: Optional[str] = Field(None, description="Numéro du Titre Foncier (e.g. TF 48291/Wouri)")
     owner_name: Optional[str] = Field(None, description="Nom du propriétaire ou déclarant")
-    locality: str = Field(..., description="Localité / Quartier (e.g. Douala Yassa)")
+    locality: str = Field("Cameroun", description="Localité / Quartier (e.g. Douala Yassa)")
     region: str = Field("Littoral", description="Région du Cameroun")
     division: Optional[str] = Field(None, description="Département (e.g. Wouri, Mfoundi)")
     surveyor_name: Optional[str] = Field(None, description="Nom du Géomètre-Expert")
     surveyor_order_number: Optional[str] = Field(None, description="Numéro d'agrément OGEC")
     utm_zone: UTMZoneEnum = Field(UTMZoneEnum.ZONE_32N, description="Zone UTM (32N ou 33N)")
-    stated_area_sqm: float = Field(..., gt=0, description="Superficie mentionnée sur le plan en m²")
+    stated_area_sqm: float = Field(0.0, description="Superficie mentionnée sur le plan en m²")
     date_surveyed: Optional[str] = Field(None, description="Date de confection du plan (YYYY-MM-DD)")
     beacons: List[BeaconInput] = Field(..., min_length=3, description="Liste ordonnée des bornes du périmètre")
 

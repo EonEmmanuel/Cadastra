@@ -63,6 +63,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition", "Content-Length"],
 )
 
 engine = CadastralEngine()
@@ -341,11 +342,30 @@ def health_check():
     }
 
 
+# In-memory registry for recently audited plans so on-the-fly uploads can be retrieved for PDF/reports
+RECENT_VERIFIED_PLANS: Dict[str, PlanVerificationRequest] = {}
+SAVED_PLANS_DIR = Path(__file__).resolve().parent / "saved_plans"
+SAVED_PLANS_DIR.mkdir(parents=True, exist_ok=True)
+
+def _save_plan_to_disk(req: PlanVerificationRequest):
+    try:
+        safe_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", req.plan_id or "plan")
+        target_file = SAVED_PLANS_DIR / f"{safe_id}.json"
+        with open(target_file, "w", encoding="utf-8") as f:
+            json.dump(req.model_dump(), f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
 @app.post("/api/verify", response_model=PlanVerificationResponse)
 def verify_cadastral_plan(request: PlanVerificationRequest):
     """Verify cadastral survey plan coordinates, polygon geometry, and superficie fictive."""
     try:
         response = engine.verify_plan(request)
+        if request.plan_id:
+            RECENT_VERIFIED_PLANS[request.plan_id] = request
+            clean_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id).lower()
+            RECENT_VERIFIED_PLANS[clean_id] = request
+            _save_plan_to_disk(request)
         return response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -354,25 +374,51 @@ def verify_cadastral_plan(request: PlanVerificationRequest):
 
 
 def _find_plan_by_id(query: str, prefer_fraud: bool = False) -> Optional[PlanVerificationRequest]:
-    """Search for a plan by plan_id, filename, or title_number in test_data."""
-    if not TEST_DATA_DIR.exists():
-        return None
+    """Search for a plan by plan_id, filename, or title_number in memory, saved_plans, and test_data."""
     cleaned = query.strip().lower()
-    if not cleaned or len(cleaned) < 3:
+    if not cleaned:
         return None
 
-    all_files = list(TEST_DATA_DIR.glob("*.json"))
+    # Check recent in-memory verifications first
+    if query in RECENT_VERIFIED_PLANS:
+        return RECENT_VERIFIED_PLANS[query]
+    if cleaned in RECENT_VERIFIED_PLANS:
+        return RECENT_VERIFIED_PLANS[cleaned]
+    for k, v in RECENT_VERIFIED_PLANS.items():
+        if cleaned in k.lower():
+            return v
 
-    # 1. First pass: exact matches on filename, plan_id, or title_number
+    search_dirs = [SAVED_PLANS_DIR]
+    if TEST_DATA_DIR.exists():
+        search_dirs.append(TEST_DATA_DIR)
+
+    all_files: List[Path] = []
+    for d in search_dirs:
+        if d.exists():
+            all_files.extend(list(d.glob("*.json")))
+
+    alpha_query = re.sub(r"[^a-zA-Z0-9]", "", cleaned)
+
+    # 1. First pass: exact or normalized matches on filename, plan_id, or title_number
     for file_path in all_files:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+                file_stem_clean = file_path.stem.lower()
+                file_stem_alpha = re.sub(r"[^a-zA-Z0-9]", "", file_stem_clean)
+                pid = str(data.get("plan_id") or "").lower()
+                pid_alpha = re.sub(r"[^a-zA-Z0-9]", "", pid)
+                tnum = str(data.get("title_number") or "").lower()
+                tnum_alpha = re.sub(r"[^a-zA-Z0-9]", "", tnum)
+
                 if (
                     file_path.name.lower() == cleaned
-                    or file_path.stem.lower() == cleaned
-                    or (data.get("plan_id") and data.get("plan_id").lower() == cleaned)
-                    or (data.get("title_number") and data.get("title_number").lower() == cleaned)
+                    or file_stem_clean == cleaned
+                    or (alpha_query and alpha_query == file_stem_alpha)
+                    or (pid and pid == cleaned)
+                    or (alpha_query and alpha_query == pid_alpha)
+                    or (tnum and tnum == cleaned)
+                    or (alpha_query and alpha_query == tnum_alpha)
                 ):
                     return PlanVerificationRequest(**data)
         except Exception:
@@ -390,9 +436,12 @@ def _find_plan_by_id(query: str, prefer_fraud: bool = False) -> Optional[PlanVer
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+                file_stem_alpha = re.sub(r"[^a-zA-Z0-9]", "", file_path.stem.lower())
+                loc = str(data.get("locality") or "").lower()
                 if (
                     cleaned in file_path.stem.lower()
-                    or (data.get("locality") and cleaned in data.get("locality").lower())
+                    or (alpha_query and alpha_query in file_stem_alpha)
+                    or (loc and cleaned in loc)
                 ):
                     return PlanVerificationRequest(**data)
         except Exception:
@@ -401,36 +450,67 @@ def _find_plan_by_id(query: str, prefer_fraud: bool = False) -> Optional[PlanVer
 
 
 @app.post("/api/report/pdf")
-def generate_pdf_report(request: PlanVerificationRequest):
+def generate_pdf_report(request: PlanVerificationRequest, disposition: str = Query("attachment")):
     """Generate and download official bilingual PDF cadastral audit report (POST with body)."""
     try:
+        if request.plan_id:
+            RECENT_VERIFIED_PLANS[request.plan_id] = request
+            clean_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id).lower()
+            RECENT_VERIFIED_PLANS[clean_id] = request
+            _save_plan_to_disk(request)
         verification_result = engine.verify_plan(request)
         pdf_bytes = generate_cadastral_pdf(verification_result, request)
-        safe_plan_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id)
+        safe_plan_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id or "plan")
         filename = f"Cadastra_Cameroon_Audit_{safe_plan_id}.pdf"
-        return StreamingResponse(
-            iter([pdf_bytes]),
+        disp_type = "inline" if disposition.lower() == "inline" else "attachment"
+        return Response(
+            content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="{filename}"'},
+            headers={
+                "Content-Disposition": f'{disp_type}; filename="{filename}"',
+                "Content-Length": str(len(pdf_bytes)),
+                "Accept-Ranges": "bytes",
+            },
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la génération PDF: {str(e)}")
 
 
 @app.get("/api/report/pdf")
-def get_pdf_report_by_query(plan_id: str = Query("douala_yassa_utm32n.json", description="ID du plan ou nom du profil")):
+def get_pdf_report_by_query(
+    plan_id: str = Query("douala_yassa_utm32n.json", description="ID du plan ou nom du profil"),
+    disposition: str = Query("attachment", description="inline ou attachment"),
+):
     """Download official PDF cadastral report via GET query parameter."""
     plan_req = _find_plan_by_id(plan_id)
     if not plan_req:
         raise HTTPException(status_code=404, detail=f"Dossier cadastral {plan_id} introuvable.")
 
-    return generate_pdf_report(plan_req)
+    return generate_pdf_report(plan_req, disposition=disposition)
+
+
+@app.head("/api/report/pdf")
+def head_pdf_report_by_query(
+    plan_id: str = Query("douala_yassa_utm32n.json", description="ID du plan ou nom du profil"),
+    disposition: str = Query("attachment", description="inline ou attachment"),
+):
+    """Support HTTP HEAD requests for download managers and Chromium probes."""
+    plan_req = _find_plan_by_id(plan_id)
+    if not plan_req:
+        raise HTTPException(status_code=404, detail=f"Dossier cadastral {plan_id} introuvable.")
+    resp = generate_pdf_report(plan_req, disposition=disposition)
+    return Response(
+        content=b"",
+        status_code=200,
+        media_type="application/pdf",
+        headers=resp.headers,
+    )
 
 
 @app.get("/api/report/pdf/{plan_id}")
-def get_pdf_report_by_path(plan_id: str):
+def get_pdf_report_by_path(plan_id: str, disposition: str = Query("attachment")):
     """Download official PDF cadastral report via GET path parameter."""
-    return get_pdf_report_by_query(plan_id=plan_id)
+    return get_pdf_report_by_query(plan_id=plan_id, disposition=disposition)
 
 
 @app.get("/api/profiles")

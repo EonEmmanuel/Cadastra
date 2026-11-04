@@ -1,0 +1,43 @@
+{
+  "plan_id": "13252/MAF",
+  "title_number": null,
+  "owner_name": null,
+  "locality": "Nkolmefou I",
+  "region": "Centre",
+  "division": null,
+  "surveyor_name": null,
+  "surveyor_order_number": null,
+  "utm_zone": "32N",
+  "stated_area_sqm": 500.0,
+  "date_surveyed": null,
+  "beacons": [
+    {
+      "borne_id": "B.1",
+      "x": 784872.4146,
+      "y": 408130.9129,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B.2",
+      "x": 784897.3081,
+      "y": 408128.6121,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B.3",
+      "x": 784895.6217,
+      "y": 408108.6833,
+      "z": null,
+      "description": null
+    },
+    {
+      "borne_id": "B.4",
+      "x": 784870.7382,
+      "y": 408111.0458,
+      "z": null,
+      "description": null
+    }
+  ]
+}
