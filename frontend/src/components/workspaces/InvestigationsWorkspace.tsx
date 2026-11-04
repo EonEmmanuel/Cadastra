@@ -23,6 +23,7 @@ import {
   isFlagged,
   summarizeRecords,
 } from "@/utils/records";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface InvestigationsWorkspaceProps {
   records: VerificationRecord[];
@@ -39,6 +40,7 @@ export default function InvestigationsWorkspace({
   onOpenManualModal,
   onOpenLanding,
 }: InvestigationsWorkspaceProps) {
+  const { t, isEn } = useLanguage();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -65,9 +67,9 @@ export default function InvestigationsWorkspace({
   return (
     <div className="flex h-full flex-col gap-5 overflow-hidden">
       <WorkspaceHeader
-        eyebrow="Enquêtes foncières · Session en cours"
-        title="Investigations"
-        description="Chaque plan audité dans cette session est consigné ici avec sa géométrie, son statut de vérification et son empreinte SHA-256. Ouvrez un dossier pour retrouver la parcelle sur la carte."
+        eyebrow={t.investigationsEyebrow}
+        title={t.investigationsTitle}
+        description={t.investigationsDesc}
         actions={
           <>
             <button
@@ -76,7 +78,7 @@ export default function InvestigationsWorkspace({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
             >
               <Plus className="h-3.5 w-3.5" />
-              Saisie manuelle
+              {t.btnManualInput}
             </button>
             <button
               type="button"
@@ -84,30 +86,30 @@ export default function InvestigationsWorkspace({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200"
             >
               <Crosshair className="h-3.5 w-3.5" />
-              Nouvel audit
+              {t.btnNewAudit}
             </button>
           </>
         }
       />
 
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        <StatTile label="Dossiers audités" value={String(summary.total)} detail="Session en cours" />
+        <StatTile label={t.statTotalAudited} value={String(summary.total)} detail={isEn ? "Current session" : "Session en cours"} />
         <StatTile
-          label="Conformes"
+          label={t.statCompliant}
           value={String(summary.compliant)}
-          detail="Tolérance 76-165 respectée"
+          detail={isEn ? "Decree 76-165 respected" : "Tolérance 76-165 respectée"}
           tone="success"
         />
         <StatTile
-          label="Signalés"
+          label={t.statFlagged}
           value={String(summary.flagged)}
-          detail="Fraude ou géométrie invalide"
+          detail={isEn ? "Fraud or invalid geometry" : "Fraude ou géométrie invalide"}
           tone={summary.flagged > 0 ? "danger" : "neutral"}
         />
         <StatTile
-          label="Écart maximal"
+          label={t.statAvgDiscrepancy}
           value={`${summary.maxDiscrepancy.toFixed(1)} %`}
-          detail="Surface déclarée vs calculée"
+          detail={isEn ? "Stated vs calculated" : "Surface déclarée vs calculée"}
           tone={summary.maxDiscrepancy > 1 ? "warning" : "neutral"}
         />
       </div>
@@ -115,11 +117,11 @@ export default function InvestigationsWorkspace({
       {records.length === 0 ? (
         <EmptyState
           icon={Crosshair}
-          title="Aucune enquête ouverte"
-          description="Lancez un audit depuis l'accueil en important un plan de bornage, ou saisissez les coordonnées UTM d'une parcelle. Les dossiers apparaîtront ici automatiquement."
-          primaryAction={{ label: "Importer un plan", onClick: onOpenLanding }}
-          secondaryAction={{ label: "Saisir des coordonnées", onClick: onOpenManualModal }}
-          footnote="Aucune donnée simulée · dossiers réels uniquement"
+          title={t.emptyInvestigationsTitle}
+          description={t.emptyInvestigationsDesc}
+          primaryAction={{ label: t.btnUploadDocument, onClick: onOpenLanding }}
+          secondaryAction={{ label: t.btnManualInput, onClick: onOpenManualModal }}
+          footnote={isEn ? "Real audit records only · No synthetic fakes" : "Aucune donnée simulée · dossiers réels uniquement"}
         />
       ) : (
         <>
@@ -127,9 +129,9 @@ export default function InvestigationsWorkspace({
             <div className="flex items-center gap-1 rounded-xl border border-white/[0.08] bg-white/[0.02] p-1">
               {(
                 [
-                  { id: "all", label: `Tous (${records.length})` },
-                  { id: "flagged", label: `Signalés (${summary.flagged})` },
-                  { id: "compliant", label: `Conformes (${summary.compliant})` },
+                  { id: "all", label: `${t.filterAll} (${records.length})` },
+                  { id: "flagged", label: `${t.filterFlagged} (${summary.flagged})` },
+                  { id: "compliant", label: `${t.filterCompliant} (${summary.compliant})` },
                 ] as { id: Filter; label: string }[]
               ).map((item) => (
                 <button
@@ -152,7 +154,7 @@ export default function InvestigationsWorkspace({
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Rechercher un plan, une localité, un titre…"
+                placeholder={t.searchInvestigationsPlaceholder}
                 className="w-full bg-transparent text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none sm:w-64"
               />
             </label>
@@ -162,14 +164,14 @@ export default function InvestigationsWorkspace({
             <table className="w-full min-w-[760px] border-collapse text-left text-xs">
               <thead className="sticky top-0 z-10 bg-[#090B10]">
                 <tr className="border-b border-white/[0.08] font-mono text-xs uppercase tracking-wider text-zinc-400">
-                  <th className="px-4 py-3 font-semibold">Dossier</th>
-                  <th className="px-4 py-3 font-semibold">Localité</th>
+                  <th className="px-4 py-3 font-semibold">{t.colPlanId}</th>
+                  <th className="px-4 py-3 font-semibold">{t.colLocality}</th>
                   <th className="px-4 py-3 font-semibold">Zone</th>
-                  <th className="px-4 py-3 text-right font-semibold">Déclarée</th>
-                  <th className="px-4 py-3 text-right font-semibold">Calculée</th>
-                  <th className="px-4 py-3 text-right font-semibold">Écart</th>
-                  <th className="px-4 py-3 font-semibold">Verdict</th>
-                  <th className="px-4 py-3 text-right font-semibold">Action</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t.colAreaStated}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t.colAreaComputed}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t.discrepancy}</th>
+                  <th className="px-4 py-3 font-semibold">{t.colVerdict}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t.colActions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,7 +240,7 @@ export default function InvestigationsWorkspace({
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toneClass}`}
+                          className={`inline-flex whitespace-nowrap rounded-md border px-2.5 py-0.5 text-xs font-semibold ${toneClass}`}
                         >
                           {verdict.label}
                         </span>

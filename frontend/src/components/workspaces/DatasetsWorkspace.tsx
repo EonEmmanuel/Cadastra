@@ -17,6 +17,7 @@ import {
   EmptyState,
   WorkspaceHeader,
 } from "@/components/workspaces/WorkspacePrimitives";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface DatasetsWorkspaceProps {
   apiBaseUrl: string;
@@ -54,6 +55,7 @@ export default function DatasetsWorkspace({
   onLoadProfile,
   onOpenManualModal,
 }: DatasetsWorkspaceProps) {
+  const { t, isEn } = useLanguage();
   const [profiles, setProfiles] = useState<CadastralProfileSummary[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -74,10 +76,12 @@ export default function DatasetsWorkspace({
     } catch {
       setState("error");
       setError(
-        "Impossible de joindre le moteur cadastral sur http://localhost:8000. Démarrez le backend FastAPI, puis réessayez."
+        isEn
+          ? "Cannot reach cadastral engine on http://localhost:8000. Start FastAPI backend and retry."
+          : "Impossible de joindre le moteur cadastral sur http://localhost:8000. Démarrez le backend FastAPI, puis réessayez."
       );
     }
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, isEn]);
 
   useEffect(() => {
     loadProfiles();
@@ -97,7 +101,9 @@ export default function DatasetsWorkspace({
       onLoadProfile(plan);
     } catch {
       setProfileError(
-        `Le profil ${profile.filename} n'a pas pu être chargé. Vérifiez que le backend est démarré.`
+        isEn
+          ? `Profile ${profile.filename} could not be loaded. Verify backend status.`
+          : `Le profil ${profile.filename} n'a pas pu être chargé. Vérifiez que le backend est démarré.`
       );
     } finally {
       setLoadingFilename(null);
@@ -107,9 +113,9 @@ export default function DatasetsWorkspace({
   return (
     <div className="flex h-full flex-col gap-5 overflow-hidden">
       <WorkspaceHeader
-        eyebrow="Jeux de données · Test & ground truth"
-        title="Données"
-        description="Profils cadastraux camerounais de référence servis par le backend. Chargez un dossier pour rejouer une vérification complète et comparer le verdict du moteur au résultat attendu."
+        eyebrow={t.datasetsEyebrow}
+        title={t.datasetsTitle}
+        description={t.datasetsDesc}
         actions={
           <>
             <button
@@ -118,7 +124,7 @@ export default function DatasetsWorkspace({
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
             >
               <Crosshair className="h-3.5 w-3.5" />
-              Saisie manuelle
+              {t.btnManualInput}
             </button>
             <button
               type="button"
@@ -129,7 +135,7 @@ export default function DatasetsWorkspace({
               <RefreshCw
                 className={`h-3.5 w-3.5 ${state === "loading" ? "animate-spin" : ""}`}
               />
-              Actualiser
+              {isEn ? "Refresh" : "Actualiser"}
             </button>
           </>
         }
@@ -183,7 +189,7 @@ export default function DatasetsWorkspace({
               return (
                 <article
                   key={profile.filename}
-                  className="flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-[#040711]/60 backdrop-blur-md p-4 transition hover:border-[#60A5FA]/30 hover:bg-[#040711]/90"
+                  className="flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-[#0B0E14] p-4 transition hover:border-white/20 hover:bg-[#10141D]"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
@@ -229,7 +235,7 @@ export default function DatasetsWorkspace({
                       </div>
                       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
                         <span className="block text-zinc-400 text-[11px]">Zone</span>
-                        <span className="text-[#93C5FD] font-bold">{profile.utm_zone}</span>
+                        <span className="text-zinc-100 font-bold">{profile.utm_zone}</span>
                       </div>
                       <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
                         <span className="block text-zinc-400 text-[11px]">Bornes</span>
@@ -252,7 +258,7 @@ export default function DatasetsWorkspace({
 
                   <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3">
                     <span className="flex items-center gap-1.5 font-mono text-xs text-zinc-400">
-                      <Layers className="h-3.5 w-3.5 text-[#60A5FA]" />
+                      <Layers className="h-3.5 w-3.5 text-zinc-400" />
                       {profile.filename.endsWith(".json") ? "JSON" : "profil"}
                     </span>
                     <button

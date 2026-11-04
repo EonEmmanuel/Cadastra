@@ -32,3 +32,13 @@ To activate the whole family at once, load `.agents/skills/slop/SKILL.md`.
 Before starting, ask the user when anti-ai-slop applies: during the work, or
 after it is done.
 <!-- antislop:end -->
+
+## Button label economy & wrapping
+- Primary action buttons in compact panels (width <= 480px) must use concise labels (e.g. "Download" in English, "Téléchargement" in French) rather than multi-word sentences.
+- Always apply `whitespace-nowrap` and `shrink-0` to button text and icons to prevent multi-line text breaking on responsive viewports.
+
+## Geodetic instrument visual purity
+- Never use the Lucide `Sparkles` icon (auto_awesome, ✨) anywhere in the application.
+- Adhere strictly to the geodetic palette: Base `#060709`, Surface `#0B0E14`, Elevated `#10141D`, Single Accent Emerald `#00DF8F`. Avoid arbitrary saturated blue gradients.
+- Avoid `rounded-full` capsule badges for tags and chips; use the established radius scale (6px for controls, 10px for panels, 16px for cards).
+- Use sentence-case headings; do not use uppercase wide-tracked labels.

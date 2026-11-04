@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { LanguageProvider } from "@/i18n/LanguageContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("http://localhost:3000"),
   applicationName: "Cadastra-Cameroon",
   title: {
-    default: "CADASTRA CM — Geospatial Cadastral Intelligence",
+    default: "CADASTRA CM : Geospatial Cadastral Intelligence",
     template: "%s · Cadastra-Cameroon",
   },
   description:
@@ -41,13 +42,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "fr_CM",
     siteName: "Cadastra-Cameroon",
-    title: "CADASTRA CM — Geospatial Cadastral Intelligence",
+    title: "CADASTRA CM : Geospatial Cadastral Intelligence",
     description:
       "Audit géodésique autonome et détection de la superficie fictive pour les plans de bornage camerounais.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CADASTRA CM — Geospatial Cadastral Intelligence",
+    title: "CADASTRA CM : Geospatial Cadastral Intelligence",
     description:
       "Audit géodésique autonome et détection de la superficie fictive au Cameroun.",
   },
@@ -75,7 +76,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className="h-full bg-[#060709] text-zinc-100 antialiased font-sans selection:bg-[#00DF8F]/20 selection:text-[#00DF8F]"
       >
-        {children}
+        <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
   );

@@ -13,6 +13,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import { useLanguage } from "@/i18n/LanguageContext";
+
 interface SidebarProps {
   activeTab: string;
   recordCount?: number;
@@ -30,6 +32,9 @@ export default function Sidebar({
   isCollapsed: controlledCollapsed,
   onToggleCollapse,
 }: SidebarProps) {
+  const { language } = useLanguage();
+  const isEn = language === "en";
+
   const [internalCollapsed, setInternalCollapsed] = useState<boolean>(false);
   const isCollapsed =
     controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
@@ -43,18 +48,18 @@ export default function Sidebar({
   };
 
   const menuItems = [
-    { id: "accueil", label: "Accueil", icon: Home },
-    { id: "carte", label: "Carte", icon: MapIcon },
-    { id: "investigations", label: "Investigations", icon: Crosshair },
-    { id: "rapports", label: "Rapports", icon: FileText },
-    { id: "donnees", label: "Données", icon: Database },
-    { id: "ia", label: "IA & Analyses", icon: Activity },
-    { id: "parametres", label: "Paramètres", icon: Settings },
+    { id: "accueil", label: isEn ? "Home" : "Accueil", icon: Home },
+    { id: "carte", label: isEn ? "Map" : "Carte", icon: MapIcon },
+    { id: "investigations", label: isEn ? "Investigations" : "Investigations", icon: Crosshair },
+    { id: "rapports", label: isEn ? "Reports" : "Rapports", icon: FileText },
+    { id: "donnees", label: isEn ? "Datasets" : "Données", icon: Database },
+    { id: "ia", label: isEn ? "AI & Intel" : "IA & Analyses", icon: Activity },
+    { id: "parametres", label: isEn ? "Settings" : "Paramètres", icon: Settings },
   ];
 
   return (
     <aside
-      className={`h-full flex flex-col justify-between py-4 select-none font-sans rounded-[26px] bg-[#040711]/85 backdrop-blur-2xl border border-white/[0.08] shadow-[0_16px_40px_rgba(0,0,0,0.6)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-20 ${
+      className={`h-full flex flex-col justify-between py-4 select-none font-sans rounded-[26px] bg-[#0B0E14]/95 backdrop-blur-2xl border border-white/[0.08] shadow-[0_16px_40px_rgba(0,0,0,0.6)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] z-20 ${
         isCollapsed ? "w-16 px-2.5 items-center" : "w-52 px-3"
       }`}
     >
@@ -63,8 +68,8 @@ export default function Sidebar({
         <div className="flex items-center gap-2.5 overflow-hidden">
           {/* Geodetic Aperture Ring Logo */}
           <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.12] flex items-center justify-center shrink-0 shadow-inner">
-            <div className="w-5 h-5 rounded-full border-2 border-[#60A5FA] flex items-center justify-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_#60A5FA]" />
+            <div className="w-5 h-5 rounded-full border-2 border-[#00DF8F] flex items-center justify-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-white" />
             </div>
           </div>
           {!isCollapsed && (
@@ -72,7 +77,7 @@ export default function Sidebar({
               <span className="text-sm font-bold tracking-tight text-white leading-tight">
                 CADASTRA
               </span>
-              <span className="text-xs font-mono font-semibold text-[#60A5FA] tracking-wider">
+              <span className="text-xs font-mono font-semibold text-[#00DF8F] tracking-wider">
                 CM · WGS84
               </span>
             </div>
@@ -156,7 +161,9 @@ export default function Sidebar({
                 </span>
               )}
               {showCount && isCollapsed && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#60A5FA] ring-2 ring-[#040711]" />
+                <span className="absolute top-1 right-1 font-mono text-[9px] font-bold text-zinc-300">
+                  {recordCount}
+                </span>
               )}
             </button>
           );
@@ -176,8 +183,8 @@ export default function Sidebar({
           </button>
         ) : (
           <div className="px-2 py-1 text-xs text-zinc-400 font-mono">
-            <p className="font-semibold text-zinc-300 uppercase tracking-wide">
-              CADASTRA · CM
+            <p className="font-medium text-zinc-300">
+              Cadastra · CM
             </p>
             <p className="text-zinc-500 text-[11px] leading-tight mt-0.5">
               Moteur géodésique WGS84

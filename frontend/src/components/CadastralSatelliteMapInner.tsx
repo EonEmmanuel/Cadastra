@@ -148,14 +148,16 @@ export default function CadastralSatelliteMapInner({
     setCursorCoords({ lat: centerLat, lng: centerLon });
   }, [centerLat, centerLon]);
 
+  const centroidLat = centroid?.latitude;
+  const centroidLng = centroid?.longitude;
   useEffect(() => {
-    if (mapInstance && centroid) {
-      mapInstance.flyTo([centroid.latitude, centroid.longitude], 19, {
+    if (mapInstance && centroidLat != null && centroidLng != null) {
+      mapInstance.flyTo([centroidLat, centroidLng], 19, {
         animate: true,
         duration: 1.0,
       });
     }
-  }, [centroid?.latitude, centroid?.longitude, mapInstance]);
+  }, [centroidLat, centroidLng, mapInstance]);
 
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
@@ -205,21 +207,21 @@ export default function CadastralSatelliteMapInner({
   ) => {
     const tone =
       variant === "red"
-        ? "bg-[#060913]/90 text-red-300 ring-1 ring-red-500/30"
+        ? "bg-[#060709]/90 text-red-300 ring-1 ring-red-500/30"
         : variant === "amber"
         ? "bg-[#060913]/90 text-amber-300 ring-1 ring-amber-500/30"
-        : "bg-[#060913]/90 text-blue-200 ring-1 ring-[#60A5FA]/30";
+        : "bg-[#060709]/90 text-emerald-200 ring-1 ring-[#00DF8F]/30";
     const dot =
       variant === "red"
         ? "bg-red-400 shadow-[0_0_6px_#EF4444]"
         : variant === "amber"
         ? "bg-amber-400 shadow-[0_0_6px_#F59E0B]"
-        : "bg-[#60A5FA] shadow-[0_0_6px_#60A5FA]";
+        : "bg-[#00DF8F] shadow-[0_0_6px_#00DF8F]";
 
     return L.divIcon({
       className: "map-overlay-marker",
       html: `
-        <div class="flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-md shadow-xl text-xs whitespace-nowrap ${tone}">
+        <div class="flex items-center gap-2 px-3 py-1 rounded-md backdrop-blur-md shadow-xl text-xs whitespace-nowrap ${tone}">
           <span class="w-2 h-2 rounded-full ${dot} shrink-0"></span>
           <span class="font-medium text-zinc-200 font-sans tracking-tight">${title}</span>
           <span class="text-zinc-500 font-mono">·</span>
@@ -236,7 +238,7 @@ export default function CadastralSatelliteMapInner({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative select-none font-sans overflow-hidden bg-[#03060E]"
+      className="w-full h-full relative select-none font-sans overflow-hidden bg-[#060709]"
     >
       {/* 1. TOP FLOATING HUD OVER MAP (Dynamically offset between docks) */}
       <div
@@ -247,15 +249,15 @@ export default function CadastralSatelliteMapInner({
         }}
       >
         {/* Left: Location & Parcel Stats */}
-        <div className="pointer-events-auto flex items-center gap-2 p-1.5 rounded-2xl bg-[#040711]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+        <div className="pointer-events-auto flex items-center gap-2 p-1.5 rounded-2xl bg-[#0B0E14]/85 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.05] text-xs sm:text-[13px] font-semibold text-zinc-100">
             <span className="w-2 h-2 rounded-full bg-[#00DF8F]" />
             <span>{locality}</span>
-            <span className="text-xs font-mono font-semibold text-[#93C5FD]">({utmZone})</span>
+            <span className="text-xs font-mono font-semibold text-zinc-400">({utmZone})</span>
           </div>
 
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.02] text-xs font-mono text-zinc-300 font-medium">
-            <Layers className="w-3.5 h-3.5 text-[#60A5FA]" />
+            <Layers className="w-3.5 h-3.5 text-zinc-400" />
             <span>
               {beacons.length > 0
                 ? `${beacons.length} bornes · ${Math.round(

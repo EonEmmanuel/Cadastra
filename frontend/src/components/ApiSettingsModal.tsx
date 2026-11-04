@@ -11,6 +11,7 @@ import {
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface ApiSettingsModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function ApiSettingsModal({
   onClose,
   apiBaseUrl,
 }: ApiSettingsModalProps) {
+  const { t, isEn } = useLanguage();
   const [whatsappToken, setWhatsappToken] = useState("");
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
@@ -116,7 +118,7 @@ export default function ApiSettingsModal({
     } catch (error) {
       setSaveError(
         error instanceof Error
-          ? `Configuration non enregistrée — ${error.message}`
+          ? `Configuration non enregistrée : ${error.message}`
           : "Configuration non enregistrée : backend injoignable."
       );
     } finally {
@@ -177,10 +179,10 @@ export default function ApiSettingsModal({
               </div>
               <div>
                 <h3 id="api-settings-title" className="text-sm font-display font-bold text-white tracking-tight">
-                  Configuration Clés API & Webhook
+                  {t.apiSettingsTitle}
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Meta WhatsApp Cloud API & Modèles d&apos;Analyse
+                  {t.apiSettingsSubtitle}
                 </p>
               </div>
             </div>
@@ -340,7 +342,7 @@ export default function ApiSettingsModal({
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                      Absente du serveur — extraction indisponible
+                      Absente du serveur : extraction indisponible
                     </span>
                   )
                 ) : (
@@ -354,7 +356,7 @@ export default function ApiSettingsModal({
                 type="password"
                 value={metaLlamaKey}
                 onChange={(e) => setMetaLlamaKey(e.target.value)}
-                placeholder="Override optionnel — sinon la clé vit dans backend/.env côté serveur"
+                placeholder="Override optionnel (sinon la clé vit dans backend/.env côté serveur)"
                 className="w-full bg-white/[0.03] ring-1 ring-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-zinc-200 outline-none focus:ring-sky-400/50 transition"
               />
               <p className="text-[10px] text-zinc-500">
@@ -391,7 +393,7 @@ export default function ApiSettingsModal({
               className="px-4 py-2 rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-xs font-medium text-zinc-300 hover:text-white transition flex items-center gap-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Tester Connexion</span>
+              <span>{isEn ? "Test Connection" : "Tester Connexion"}</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -399,7 +401,7 @@ export default function ApiSettingsModal({
                 onClick={onClose}
                 className="px-4 py-2 rounded-full hover:bg-white/[0.06] text-xs font-medium text-zinc-400 hover:text-white transition"
               >
-                Annuler
+                {t.btnCancel}
               </button>
               <button
                 onClick={handleSave}
@@ -409,10 +411,10 @@ export default function ApiSettingsModal({
                 {saveSuccess ? (
                   <>
                     <Check className="w-3.5 h-3.5" />
-                    <span>Enregistré !</span>
+                    <span>{isEn ? "Saved!" : "Enregistré !"}</span>
                   </>
                 ) : (
-                  <span>Enregistrer</span>
+                  <span>{t.btnSaveSettings}</span>
                 )}
               </button>
             </div>

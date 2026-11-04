@@ -22,6 +22,7 @@ import {
   WorkspaceHeader,
 } from "@/components/workspaces/WorkspacePrimitives";
 import { getVerdict, summarizeRecords } from "@/utils/records";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface IntelligenceWorkspaceProps {
   records: VerificationRecord[];
@@ -31,34 +32,6 @@ interface IntelligenceWorkspaceProps {
   apiConnected: boolean;
 }
 
-const PIPELINE = [
-  {
-    icon: FileSearch,
-    title: "Ingestion du plan",
-    detail: "Photo, scan ou PDF · rendu 350 DPI pour les documents non textuels.",
-  },
-  {
-    icon: ScanLine,
-    title: "SAM 3.1 · ROI",
-    detail: "Segmentation du tableau des bornes avant lecture des coordonnées.",
-  },
-  {
-    icon: BrainCircuit,
-    title: "Muse Spark · extraction",
-    detail: "Sortie structurée Bornes B1…Bn, X, Y, Z et surface déclarée.",
-  },
-  {
-    icon: Ruler,
-    title: "Moteur géodésique",
-    detail: "PyProj UTM 32N/33N ➔ WGS84, Shoelace, périmètre et auto-intersection.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Verdict géodésique",
-    detail: "Tolérance 1.0%, indicateurs d'anomalie et sceau SHA-256.",
-  },
-];
-
 export default function IntelligenceWorkspace({
   records,
   extractionPreview,
@@ -66,66 +39,90 @@ export default function IntelligenceWorkspace({
   onOpenLanding,
   apiConnected,
 }: IntelligenceWorkspaceProps) {
+  const { t, isEn } = useLanguage();
   const summary = summarizeRecords(records);
   const averageRisk =
     records.length === 0
       ? 0
       : records.reduce((sum, record) => sum + record.result.risk_score, 0) / records.length;
 
+  const PIPELINE = [
+    {
+      icon: FileSearch,
+      title: t.pipelineStep1Title,
+      detail: t.pipelineStep1Desc,
+    },
+    {
+      icon: ScanLine,
+      title: t.pipelineStep2Title,
+      detail: t.pipelineStep2Desc,
+    },
+    {
+      icon: BrainCircuit,
+      title: t.pipelineStep3Title,
+      detail: t.pipelineStep3Desc,
+    },
+    {
+      icon: Ruler,
+      title: t.pipelineStep4Title,
+      detail: t.pipelineStep4Desc,
+    },
+    {
+      icon: ShieldCheck,
+      title: t.pipelineStep5Title,
+      detail: t.pipelineStep5Desc,
+    },
+  ];
+
   return (
     <div className="flex h-full flex-col gap-5 overflow-y-auto pr-1">
       <WorkspaceHeader
-        eyebrow="Chaîne d'analyse · Muse Spark + SAM 3.1"
-        title="IA & Analyses"
-        description="Le chemin complet entre un plan papier et un verdict opposable : segmentation, extraction structurée, projection géodésique et contrôle réglementaire. Aucune étape n'est simulée dans l'interface."
+        eyebrow={t.intelligenceEyebrow}
+        title={t.intelligenceTitle}
+        description={t.intelligenceDesc}
         actions={
           <span
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
               apiConnected
                 ? "border-[#00DF8F]/30 bg-[#00DF8F]/10 text-[#00DF8F]"
                 : "border-zinc-500/25 bg-white/[0.03] text-zinc-400"
             }`}
           >
-            <span
-              className={`h-2 w-2 rounded-full ${
-                apiConnected ? "bg-[#00DF8F]" : "bg-zinc-500"
-              }`}
-            />
-            {apiConnected ? "Backend connecté" : "Fallback local"}
+            {apiConnected ? t.apiConnected : t.apiOffline}
           </span>
         }
       />
 
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        <StatTile label="Analyses exécutées" value={String(summary.total)} detail="Session en cours" />
+        <StatTile label={t.statTotalAudited} value={String(summary.total)} detail={isEn ? "Current session" : "Session en cours"} />
         <StatTile
-          label="Taux de conformité"
+          label={isEn ? "Compliance Rate" : "Taux de conformité"}
           value={`${summary.complianceRate} %`}
-          detail="Tolérance réglementaire"
+          detail={isEn ? "Statutory tolerance" : "Tolérance réglementaire"}
           tone={summary.complianceRate >= 100 ? "success" : "warning"}
         />
         <StatTile
-          label="Score de risque moyen"
+          label={t.statAverageRisk}
           value={`${Math.round(averageRisk)} / 100`}
-          detail="Moteur Gauss-Shoelace"
+          detail={isEn ? "Gauss-Shoelace Engine" : "Moteur Gauss-Shoelace"}
           tone={averageRisk > 60 ? "danger" : averageRisk > 30 ? "warning" : "success"}
         />
         <StatTile
-          label="Écart maximal"
+          label={isEn ? "Max Discrepancy" : "Écart maximal"}
           value={`${summary.maxDiscrepancy.toFixed(1)} %`}
-          detail="Surface fictive potentielle"
+          detail={isEn ? "Potential fictitious area" : "Surface fictive potentielle"}
           tone={summary.maxDiscrepancy > 1 ? "danger" : "neutral"}
         />
       </div>
 
       {/* Pipeline */}
-      <section className="rounded-2xl border border-white/[0.08] bg-[#040711]/60 backdrop-blur-md p-4">
+      <section className="rounded-2xl border border-white/[0.08] bg-[#0B0E14] p-4">
         <div className="mb-4 flex items-center gap-2">
-          <BrainCircuit className="h-4 w-4 text-[#60A5FA]" />
-          <h2 className="text-sm font-bold tracking-tight text-white">
+          <BrainCircuit className="h-4 w-4 text-[#00DF8F]" />
+          <h2 className="text-sm font-medium tracking-tight text-white">
             Pipeline d&apos;audit géodésique
           </h2>
-          <span className="ml-auto font-mono text-xs uppercase tracking-wider text-[#93C5FD]">
+          <span className="ml-auto font-mono text-xs text-zinc-400">
             5 étapes
           </span>
         </div>
@@ -136,11 +133,11 @@ export default function IntelligenceWorkspace({
             return (
               <li
                 key={step.title}
-                className="relative rounded-xl border border-white/[0.07] bg-[#040711]/90 p-3.5"
+                className="relative rounded-xl border border-white/[0.07] bg-[#10141D] p-3.5"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04]">
-                    <Icon className="h-4 w-4 text-[#60A5FA]" />
+                    <Icon className="h-4 w-4 text-zinc-300" />
                   </div>
                   <span className="font-mono text-xs font-semibold text-zinc-400">
                     0{index + 1}
@@ -161,10 +158,10 @@ export default function IntelligenceWorkspace({
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         {/* Last extraction provenance */}
-        <section className="rounded-2xl border border-white/[0.08] bg-[#040711]/60 backdrop-blur-md p-4">
+        <section className="rounded-2xl border border-white/[0.08] bg-[#0B0E14] p-4">
           <div className="mb-3 flex items-center gap-2">
-            <Cpu className="h-4 w-4 text-[#60A5FA]" />
-            <h2 className="text-sm font-bold tracking-tight text-white">
+            <Cpu className="h-4 w-4 text-[#00DF8F]" />
+            <h2 className="text-sm font-medium tracking-tight text-white">
               Provenance de la dernière extraction
             </h2>
           </div>
@@ -183,17 +180,17 @@ export default function IntelligenceWorkspace({
                 >
                   <span className="shrink-0 text-zinc-400 font-medium">{row.label}</span>
                   <span className="text-right font-mono text-zinc-200">
-                    {row.value || "—"}
+                    {row.value || "-"}
                   </span>
                 </div>
               ))}
               <div className="flex items-center justify-between border-t border-white/[0.05] pt-2.5">
                 <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                  <Languages className="h-3.5 w-3.5 text-[#60A5FA]" />
+                  <Languages className="h-3.5 w-3.5 text-zinc-400" />
                   Langue détectée
                 </span>
-                <span className="font-mono uppercase font-bold text-[#93C5FD]">
-                  {extractionPreview.detectedLanguage || "—"}
+                <span className="font-mono text-xs font-medium text-zinc-200">
+                  {extractionPreview.detectedLanguage || "-"}
                 </span>
               </div>
             </div>
@@ -209,7 +206,7 @@ export default function IntelligenceWorkspace({
         </section>
 
         {/* Session analytics */}
-        <section className="rounded-2xl border border-white/[0.08] bg-[#040711]/60 backdrop-blur-md p-4">
+        <section className="rounded-2xl border border-white/[0.08] bg-[#0B0E14] p-4">
           <div className="mb-3 flex items-center gap-2">
             <Gauge className="h-4 w-4 text-[#00DF8F]" />
             <h2 className="text-sm font-bold tracking-tight text-white">
@@ -246,9 +243,9 @@ export default function IntelligenceWorkspace({
                         {count} · {Math.round(percentage)} %
                       </span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                    <div className="h-1.5 w-full overflow-hidden rounded-sm bg-white/[0.06]">
                       <div
-                        className={`h-full rounded-full ${bucket.tone}`}
+                        className={`h-full rounded-sm ${bucket.tone}`}
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -290,7 +287,7 @@ export default function IntelligenceWorkspace({
       </div>
 
       {records.length === 0 && (
-        <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#040711]/60 backdrop-blur-md p-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#0B0E14] p-4 sm:flex-row sm:items-center">
           <div>
             <p className="text-sm font-bold text-white">
               Aucune analyse dans cette session

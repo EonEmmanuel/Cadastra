@@ -44,6 +44,7 @@ Neutral greys, white, and black do not count toward the core palette. Emerald is
 - Status is plain text with a semantic colour and, only when it adds meaning, a functional icon. No dot status badges. No pill or capsule badges.
 - Cards contain real data groups. Text is never wrapped in a card, chip, or grid purely to give it a shape.
 - Primary button: white surface, dark text. Secondary: hairline border. Ghost: text only. No gradient buttons, no glow buttons.
+- Button labels in compact docks and sidebars must remain concise ("Download" / "Téléchargement") with `whitespace-nowrap` to prevent awkward line breaks. Icons use `shrink-0`.
 - Shadows mark elevation only. Most surfaces sit flat.
 - Glass is limited to at most one or two elements, such as a modal scrim. It is not the character of the whole interface.
 

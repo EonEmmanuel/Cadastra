@@ -123,17 +123,17 @@ export default function AiExtractionReviewModal({
         className="w-full max-w-4xl p-2 rounded-3xl bg-white/[0.02] ring-1 ring-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
       >
         {/* Inner Surface */}
-        <div className="rounded-2xl bg-[#090B10] flex flex-col flex-1 overflow-hidden">
+        <div className="rounded-2xl bg-[#0B0E14] flex flex-col flex-1 overflow-hidden">
           {/* Header */}
           <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02] shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#60A5FA]/10 ring-1 ring-[#60A5FA]/20 flex items-center justify-center">
-                <ScanText className="w-5 h-5 text-[#60A5FA]" />
+              <div className="w-9 h-9 rounded-xl bg-[#00DF8F]/10 border border-[#00DF8F]/25 flex items-center justify-center">
+                <ScanText className="w-5 h-5 text-[#00DF8F]" />
               </div>
               <div>
                 <h3 id="ai-review-title" className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
                   Extraction Optique & Revue Humaine
-                  <span className="px-2 py-0.5 rounded-full bg-[#60A5FA]/15 text-[#93C5FD] text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-zinc-300 text-[10px] font-mono">
                     Audit optique WGS84
                   </span>
                 </h3>
@@ -244,7 +244,7 @@ export default function AiExtractionReviewModal({
                     <span className="text-[#00DF8F]">Relecture zoom</span>
                     <span>
                       {previewData.zoomRecheck === "applied"
-                        ? "appliquée — chaque chiffre relu sur ce recadrage"
+                        ? "appliquée : chaque chiffre relu sur ce recadrage"
                         : previewData.zoomRecheck ?? ""}
                     </span>
                   </p>
@@ -295,13 +295,13 @@ export default function AiExtractionReviewModal({
             <div className="lg:col-span-7 space-y-4 flex flex-col justify-between">
               {/* AI Assistant Prompt Box */}
               <div className="p-3.5 rounded-2xl bg-[#00DF8F]/[0.08] ring-1 ring-[#00DF8F]/20 space-y-1.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#60A5FA]">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-[#00DF8F]" />
                   <span>Validation Géodésique & Contrôle Qualité</span>
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed font-normal">
                   Le moteur d&apos;extraction a relevé{" "}
-                  <span className="text-[#93C5FD] font-semibold">{beacons.length} bornes</span> depuis
+                  <span className="text-[#00DF8F] font-semibold">{beacons.length} bornes</span> depuis
                   votre document. Vérifiez ou corrigez chaque valeur ci-dessous avant de lancer le
                   calcul géodésique Gauss-Shoelace et l&apos;audit anti-fraude.
                 </p>

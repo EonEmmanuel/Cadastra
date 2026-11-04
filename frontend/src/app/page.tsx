@@ -7,6 +7,7 @@ import {
   UploadCloud,
   Crosshair,
   Layers3,
+  Loader2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
@@ -32,8 +33,10 @@ import {
 import { verifyCadastralPlanLocally } from "@/utils/geodesy";
 import { makeRecordId } from "@/utils/records";
 import { API_BASE, apiFetch } from "@/utils/api";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 function CadastraAppContent() {
+  const { isEn, t } = useLanguage();
   const searchParams = useSearchParams();
   const urlView = searchParams.get("view");
   const urlTab = searchParams.get("tab");
@@ -495,7 +498,7 @@ function CadastraAppContent() {
                     className={`absolute right-4 top-4 bottom-4 z-20 pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                       isDossierCollapsed
                         ? "translate-x-[calc(100%+2rem)] opacity-0 pointer-events-none"
-                        : "translate-x-0 opacity-100 w-[420px] max-w-[calc(100vw-6rem)]"
+                        : "translate-x-0 opacity-100 w-[420px] max-w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-6rem)]"
                     }`}
                   >
                     <ForensicDossierPanel
@@ -517,21 +520,20 @@ function CadastraAppContent() {
                   <button
                     type="button"
                     onClick={() => setIsDossierCollapsed(false)}
-                    title="Afficher le dossier d'audit"
-                    className="absolute right-4 top-4 z-20 pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#040711]/90 backdrop-blur-xl border border-white/[0.08] text-xs font-semibold text-white shadow-2xl hover:bg-white/[0.08] transition"
+                    title={isEn ? "Open audit dossier" : "Afficher le dossier d'audit"}
+                    className="absolute right-4 top-4 z-20 pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#0B0E14]/95 backdrop-blur-xl border border-white/[0.08] text-xs font-semibold text-white shadow-2xl hover:bg-white/[0.08] transition"
                   >
-                    <FileText className="w-4 h-4 text-[#60A5FA]" />
-                    <span>Dossier d&apos;audit</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#60A5FA] shadow-[0_0_8px_#60A5FA]" />
+                    <FileText className="w-4 h-4 text-[#00DF8F]" />
+                    <span>{isEn ? "Audit Dossier" : "Dossier d'audit"}</span>
                   </button>
                 )}
 
                 {/* Loading Indicator Overlay */}
                 {isLoading && (
                   <div className="absolute inset-0 z-20 flex items-center justify-center p-4 pointer-events-none">
-                    <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#040711]/90 border border-white/[0.12] backdrop-blur-xl shadow-2xl text-xs font-mono text-zinc-200">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#60A5FA] animate-ping" />
-                      <span>Calcul géodésique Gauss-Shoelace et projection WGS84 en cours...</span>
+                    <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#0B0E14]/95 border border-white/[0.12] backdrop-blur-xl shadow-2xl text-xs font-mono text-zinc-200">
+                      <Loader2 className="w-4 h-4 text-[#00DF8F] animate-spin shrink-0" />
+                      <span>{isEn ? "Computing Gauss-Shoelace geodesy and WGS84 projection..." : "Calcul géodésique Gauss-Shoelace et projection WGS84 en cours..."}</span>
                     </div>
                   </div>
                 )}
@@ -539,9 +541,9 @@ function CadastraAppContent() {
                 {/* Session Restoring Placeholder */}
                 {!isRestoredFromSession && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center p-4 pointer-events-none">
-                    <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#090B10]/80 border border-white/[0.08] backdrop-blur-md text-xs font-mono text-zinc-400">
-                      <span className="w-2 h-2 rounded-full bg-[#60A5FA] animate-ping" />
-                      <span>Initialisation de la session géodésique...</span>
+                    <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#0B0E14]/95 border border-white/[0.08] backdrop-blur-md text-xs font-mono text-zinc-400">
+                      <Loader2 className="w-3.5 h-3.5 text-[#00DF8F] animate-spin shrink-0" />
+                      <span>{isEn ? "Initializing geodetic session..." : "Initialisation de la session géodésique..."}</span>
                     </div>
                   </div>
                 )}
@@ -589,7 +591,7 @@ function CadastraAppContent() {
                       <button
                         type="button"
                         onClick={() => setActiveNavTab("donnees")}
-                        className="mt-3 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500 transition hover:text-zinc-300"
+                        className="mt-3 inline-flex items-center gap-1 text-xs text-zinc-400 transition hover:text-zinc-200"
                       >
                         <FileText className="h-3 w-3" />
                         Ou parcourir les jeux de données
@@ -601,7 +603,7 @@ function CadastraAppContent() {
             ) : (
               /* Secondary workspaces floating over the full-bleed map */
               <div
-                className="absolute top-4 bottom-4 right-4 z-20 pointer-events-auto overflow-hidden rounded-2xl border border-white/[0.08] bg-[#040711]/95 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 transition-all duration-300"
+                className="absolute top-4 bottom-4 right-4 z-20 pointer-events-auto overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0B0E14]/95 backdrop-blur-2xl shadow-2xl p-4 sm:p-5 transition-all duration-300"
                 style={{
                   left: isSidebarCollapsed
                     ? `${64 + 32}px`
@@ -657,9 +659,9 @@ export default function CadastraApp() {
   return (
     <Suspense
       fallback={
-        <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#03060E] text-zinc-400 font-mono text-xs">
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#060709] text-zinc-400 font-mono text-xs">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#60A5FA] animate-ping" />
+            <Loader2 className="w-4 h-4 text-[#00DF8F] animate-spin shrink-0" />
             <span>Initialisation du terminal géodésique...</span>
           </div>
         </div>

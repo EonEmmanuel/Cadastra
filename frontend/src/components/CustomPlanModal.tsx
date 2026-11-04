@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { BeaconInput, PlanVerificationRequest } from "@/types/cadastre";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface CustomPlanModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export default function CustomPlanModal({
   onClose,
   onSubmit,
 }: CustomPlanModalProps) {
+  const { t, isEn } = useLanguage();
   const [planId, setPlanId] = useState("");
   const [titleNumber, setTitleNumber] = useState("");
   const [ownerName, setOwnerName] = useState("");
@@ -169,10 +171,10 @@ export default function CustomPlanModal({
             </div>
             <div>
               <h3 id="custom-plan-title" className="text-sm font-bold text-white tracking-tight">
-                Saisie Manuelle des Coordonnées Géodésiques
+                {t.customPlanTitle}
               </h3>
               <p className="text-xs text-zinc-400">
-                Système Géodésique WGS84 · Projection UTM Snyder
+                {t.customPlanSubtitle}
               </p>
             </div>
           </div>
@@ -182,15 +184,15 @@ export default function CustomPlanModal({
               type="button"
               onClick={fillExample}
               className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
-              title="Remplir avec une parcelle réelle de test_data"
+              title={isEn ? "Fill with ground-truth parcel" : "Remplir avec une parcelle réelle de test_data"}
             >
-              <FileSpreadsheet className="w-3 h-3 text-[#60A5FA]" />
-              Exemple Douala
+              <FileSpreadsheet className="w-3 h-3 text-zinc-400" />
+              {t.btnLoadDoualaExample}
             </button>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Fermer"
+              aria-label={t.btnCancel}
               className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] transition"
             >
               <X className="w-4 h-4" />
@@ -203,7 +205,7 @@ export default function CustomPlanModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
-                Identifiant du Plan
+                {t.fieldPlanId}
               </label>
               <input
                 type="text"
@@ -216,7 +218,7 @@ export default function CustomPlanModal({
 
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
-                Numéro du Titre Foncier
+                {t.fieldTitleNumber}
               </label>
               <input
                 type="text"
@@ -229,7 +231,7 @@ export default function CustomPlanModal({
 
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
-                Propriétaire déclarant
+                {t.fieldOwnerName}
               </label>
               <input
                 type="text"
@@ -242,7 +244,7 @@ export default function CustomPlanModal({
 
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
-                Localité / Ville
+                {t.fieldLocality}
               </label>
               <input
                 type="text"
@@ -255,7 +257,7 @@ export default function CustomPlanModal({
 
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
-                Région
+                {t.fieldRegion}
               </label>
               <select
                 value={region}
@@ -387,14 +389,14 @@ export default function CustomPlanModal({
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.08] text-xs text-zinc-300 transition"
             >
-              Annuler
+              {t.btnCancel}
             </button>
 
             <button
               type="submit"
               className="px-5 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition shadow-lg active:scale-95"
             >
-              Lancer l&apos;Audit Géodésique
+              {t.btnSubmitVerification}
             </button>
           </div>
         </form>

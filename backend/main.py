@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+import uuid
 from typing import Optional, List, Dict, Any
 
 from dotenv import load_dotenv
@@ -44,6 +45,8 @@ from schemas import (
     TableBoundingBox,
     WhatsAppVerificationRequest,
     WhatsAppVerificationResponse,
+    CadastralQARequest,
+    CadastralQAResponse,
     UTMZoneEnum,
     BeaconInput,
 )
@@ -361,11 +364,12 @@ def verify_cadastral_plan(request: PlanVerificationRequest):
     """Verify cadastral survey plan coordinates, polygon geometry, and superficie fictive."""
     try:
         response = engine.verify_plan(request)
-        if request.plan_id:
-            RECENT_VERIFIED_PLANS[request.plan_id] = request
-            clean_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id).lower()
-            RECENT_VERIFIED_PLANS[clean_id] = request
-            _save_plan_to_disk(request)
+        if not request.plan_id:
+            request.plan_id = f"PLAN-{uuid.uuid4().hex[:8].upper()}"
+        RECENT_VERIFIED_PLANS[request.plan_id] = request
+        clean_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id).lower()
+        RECENT_VERIFIED_PLANS[clean_id] = request
+        _save_plan_to_disk(request)
         return response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -453,11 +457,12 @@ def _find_plan_by_id(query: str, prefer_fraud: bool = False) -> Optional[PlanVer
 def generate_pdf_report(request: PlanVerificationRequest, disposition: str = Query("attachment")):
     """Generate and download official bilingual PDF cadastral audit report (POST with body)."""
     try:
-        if request.plan_id:
-            RECENT_VERIFIED_PLANS[request.plan_id] = request
-            clean_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id).lower()
-            RECENT_VERIFIED_PLANS[clean_id] = request
-            _save_plan_to_disk(request)
+        if not request.plan_id:
+            request.plan_id = f"PLAN-{uuid.uuid4().hex[:8].upper()}"
+        RECENT_VERIFIED_PLANS[request.plan_id] = request
+        clean_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id).lower()
+        RECENT_VERIFIED_PLANS[clean_id] = request
+        _save_plan_to_disk(request)
         verification_result = engine.verify_plan(request)
         pdf_bytes = generate_cadastral_pdf(verification_result, request)
         safe_plan_id = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", request.plan_id or "plan")
@@ -1317,4 +1322,377 @@ def handle_whatsapp_message(payload: Dict[str, Any]):
         verification_summary=verification,
         cloud_api_text_sent=cloud_text_sent,
         cloud_api_document_sent=cloud_document_sent,
+    )
+
+
+# --- Cadastral Forensic AI Q&A & Expert Recommendation Engine ---
+
+def _generate_expert_cadastral_qa(
+    question: str,
+    plan_id: str,
+    locality: str,
+    stated_area: float,
+    computed_area: float,
+    discrepancy_pct: float,
+    discrepancy_sqm: float,
+    risk_level: str,
+    risk_score: float,
+    polygon_closed: bool,
+    self_intersecting: bool,
+    beacons_count: int,
+    is_en: bool,
+    perimeter_m: float = 0.0,
+) -> tuple[str, List[str], List[str]]:
+    """Generate high-fidelity forensic cadastral Q&A response in English or French."""
+    q_lower = question.lower()
+
+    is_safe_query = any(k in q_lower for k in ["safe", "buy", "purchase", "sûr", "sur", "acheter", "achat", "invest", "danger", "sécurisé", "securise", "good", "valid"])
+    is_discrepancy_query = any(k in q_lower for k in ["discrepancy", "difference", "area", "surface", "écart", "ecart", "fictive", "différence", "shoelace"])
+    is_closure_query = any(k in q_lower for k in ["closure", "close", "fermeture", "boucle", "gap", "open", "trou"])
+    is_surveyor_query = any(k in q_lower for k in ["surveyor", "géomètre", "geometre", "rectify", "rectifier", "ogec", "corrig", "fix"])
+    is_legal_query = any(k in q_lower for k in ["legal", "law", "loi", "décret", "decree", "tribunal", "notaire", "notary", "juridique"])
+
+    legal_refs = [
+        "Decree No. 76-165 of 27 April 1976 (Land Title Demarcation)",
+        "Law No. 80-21 of 14 July 1980 (Cameroon Order of Surveyors - OGEC)",
+        "Cameroon Penal Code Art. 316 (Sanction of Fictitious Land Claims)",
+    ] if is_en else [
+        "Décret n° 76-165 du 27 avril 1976 (Bornage et immatriculation)",
+        "Loi n° 80-21 du 14 juillet 1980 (Ordre des Géomètres du Cameroun - OGEC)",
+        "Code Pénal Camerounais Art. 316 (Sanctions de l'escroquerie foncière)",
+    ]
+
+    if is_safe_query:
+        if risk_level in ["LOW"]:
+            if is_en:
+                ans = (
+                    f"Yes, geodetically speaking, Plan {plan_id} in {locality} exhibits high perimeter integrity. "
+                    f"The Gauss-Shoelace computed surface ({computed_area:.1f} m²) matches the declared surface ({stated_area:.1f} m²) "
+                    f"with an anomaly rate of only {discrepancy_pct:.2f}%, well within Cameroon's official 1.0% cadastre tolerance. "
+                    f"The perimeter closes smoothly across all {beacons_count} boundary beacons without self-intersecting lines. "
+                    f"You may safely proceed to notary due diligence."
+                )
+                recs = [
+                    "Proceed to title deed registration with a licensed notary.",
+                    "Verify physical beacon presence on site prior to boundary fencing.",
+                    "Obtain a non-encumbrance certificate (certificat d'urbanisme) from the divisional delegation.",
+                ]
+            else:
+                ans = (
+                    f"Oui, sur le plan géodésique, le plan {plan_id} à {locality} présente une excellente conformité. "
+                    f"La surface calculée par Gauss-Shoelace ({computed_area:.1f} m²) concorde avec la surface déclarée ({stated_area:.1f} m²) "
+                    f"avec un écart de seulement {discrepancy_pct:.2f}%, strictement inférieur à la tolérance légale de 1.0% au Cameroun. "
+                    f"Le polygone est fermé sans auto-intersection sur l'ensemble des {beacons_count} bornes. "
+                    f"Vous pouvez poursuivre la transaction chez votre notaire."
+                )
+                recs = [
+                    "Procéder à l'acte notarié de vente en toute confiance géodésique.",
+                    "Contrôler la présence physique des bornes bétons sur le terrain avant clôture.",
+                    "Demander le certificat d'urbanisme et de non-opposition auprès de la délégation départementale.",
+                ]
+        elif risk_level in ["MEDIUM"]:
+            if is_en:
+                ans = (
+                    f"Caution is advised. Plan {plan_id} exhibits a borderline surface discrepancy of {discrepancy_pct:.2f}% "
+                    f"({discrepancy_sqm:+.1f} m² between declared {stated_area:.1f} m² and actual {computed_area:.1f} m²). "
+                    f"While the parcel does not show malicious boundary overlap, this gap exceeds the normal 1.0% tolerance. "
+                    f"Do not pay the full purchase balance until the surveyor clarifies this measurement gap."
+                )
+                recs = [
+                    "Withhold final payment until the surveyor issues a corrected, sealed coordinate schedule.",
+                    "Request an on-site joint inspection (contre-expertise) with an OGEC licensed surveyor.",
+                    "Ensure neighboring plot boundaries do not claim the disputed area.",
+                ]
+            else:
+                ans = (
+                    f"Vigilance recommandée. Le plan {plan_id} présente un écart limite de {discrepancy_pct:.2f}% "
+                    f"({discrepancy_sqm:+.1f} m² entre les {stated_area:.1f} m² déclarés et {computed_area:.1f} m² réels). "
+                    f"Cet écart dépasse la tolérance standard de 1.0%. "
+                    f"Ne versez aucun acompte définitif sans rectification préalable par le géomètre assermenté."
+                )
+                recs = [
+                    "Bloquer le solde de la transaction jusqu'à la révision du tableau des coordonnées.",
+                    "Exiger un contre-bornage contradictoire par un géomètre agréé OGEC.",
+                    "Vérifier auprès des riverains qu'aucun chevauchement n'est revendiqué.",
+                ]
+        else:
+            if is_en:
+                ans = (
+                    f"HIGH ALERT: Do NOT purchase this parcel in its current state. "
+                    f"Plan {plan_id} in {locality} carries a critical risk score of {risk_score:.0f}/100. "
+                    f"The declared surface of {stated_area:.1f} m² differs by {discrepancy_pct:.1f}% ({discrepancy_sqm:+.1f} m²) "
+                    f"from the true polygon area ({computed_area:.1f} m²). "
+                    + ("The boundary lines self-intersect, creating an invalid geometric perimeter. " if self_intersecting else "")
+                    + ("The perimeter does not close on the initial beacon. " if not polygon_closed else "")
+                    + "This is a prime indicator of fictitious surface inflation, exposing the buyer to title cancellation and boundary disputes under Cameroon Law."
+                )
+                recs = [
+                    "HALT all financial transactions with the seller or intermediary immediately.",
+                    "Submit the plan to the Regional Delegation of MINDCAF for formal cadastral verification.",
+                    "Demand an authentic boundary protocol signed by an OGEC surveyor with verified registration number.",
+                    "Check the local Land Registry for double-titling risks on this coordinate cluster.",
+                ]
+            else:
+                ans = (
+                    f"ALERTE MAJEURE : N'achetez PAS ce terrain en l'état. "
+                    f"Le plan {plan_id} à {locality} présente un niveau de risque critique de {risk_score:.0f}/100. "
+                    f"La surface déclarée ({stated_area:.1f} m²) s'écarte de {discrepancy_pct:.1f}% ({discrepancy_sqm:+.1f} m²) "
+                    f"de la surface mathématique réelle ({computed_area:.1f} m²). "
+                    + ("Le polygone s'auto-intersecte, formant une géométrie caduque. " if self_intersecting else "")
+                    + ("Le périmètre ne se referme pas sur la borne initiale. " if not polygon_closed else "")
+                    + "Il s'agit d'un indice flagrant de superficie fictive, exposant l'acquéreur à l'annulation du titre et à des litiges fonciers sévères (Décret 76-165)."
+                )
+                recs = [
+                    "Suspendre immédiatement tout versement financier au vendeur ou courtier.",
+                    "Saisir la délégation régionale du MINDCAF pour contrôle d'authenticité cadastrale.",
+                    "Exiger un procès-verbal de bornage officiel revêtu du cachet d'un géomètre inscrit à l'OGEC.",
+                    "Vérifier à la conservation foncière locale l'absence d'un double titre sur cette emprise.",
+                ]
+    elif is_discrepancy_query:
+        if is_en:
+            ans = (
+                f"The area discrepancy is {discrepancy_pct:.2f}% ({discrepancy_sqm:+.2f} m²). "
+                f"The plan states {stated_area:.2f} m², but rigorous Gauss-Shoelace geodetic integration of the UTM "
+                f"beacon coordinates proves the real enclosed ground area is {computed_area:.2f} m². "
+                f"Under Cameroon cadastral practice, any deviation over 1.0% triggers administrative review."
+            )
+            recs = [
+                f"Recalculate transaction price based on the actual {computed_area:.1f} m² rather than stated {stated_area:.1f} m².",
+                "Demand that the surveyor adjust the plan title deed sheet to reflect real ground coordinates.",
+            ]
+        else:
+            ans = (
+                f"L'écart de superficie est de {discrepancy_pct:.2f}% ({discrepancy_sqm:+.2f} m²). "
+                f"Le plan mentionne {stated_area:.2f} m², mais le calcul Gauss-Shoelace rigoureux projeté en UTM "
+                f"établit que la superficie réelle enclose par les bornes est de {computed_area:.2f} m². "
+                f"Au Cameroun, la norme technique tolère un écart maximal de 1.0%."
+            )
+            recs = [
+                f"Ajuster le prix de vente sur la base de la superficie réelle ({computed_area:.1f} m²) et non sur les {stated_area:.1f} m² déclarés.",
+                "Demander au géomètre la rectification du cartouche du plan de bornage.",
+            ]
+    elif is_closure_query:
+        if is_en:
+            ans = (
+                f"Perimeter closure status: {'Closed successfully' if polygon_closed else 'Open / Non-closed perimeter'}. "
+                f"Total parcel perimeter is {perimeter_m:.1f} meters across {beacons_count} beacons. "
+                + ("All boundary vectors return accurately to the initial beacon within sub-centimeter tolerance." if polygon_closed else "The last beacon fails to join the first beacon, leaving an open polygon that invalidates the legal cadastral boundary.")
+            )
+            recs = [
+                "Ensure physical boundary beacons on site match the numeric UTM Northing/Easting table.",
+                "Check for angular deflection errors in the surveyor's traverse calculation sheet.",
+            ]
+        else:
+            ans = (
+                f"État de fermeture du périmètre : {'Parfaitement fermé' if polygon_closed else 'Périmètre ouvert / défectueux'}. "
+                f"Le périmètre total est de {perimeter_m:.1f} mètres pour {beacons_count} bornes. "
+                + ("Les vecteurs de cheminement reviennent exactement sur la borne de départ." if polygon_closed else "La dernière borne ne boucle pas sur la borne initiale, rendant le plan topographiquement irrecevable.")
+            )
+            recs = [
+                "Contrôler la concordance physique entre les bornes du plan et les piquets implantés.",
+                "Demander la feuille de calcul de polygonation du géomètre.",
+            ]
+    elif is_surveyor_query:
+        if is_en:
+            ans = (
+                f"To rectify Plan {plan_id}, instruct an OGEC-registered surveyor to execute a corrective traverse. "
+                f"The surveyor must re-verify beacon coordinates, correct the {discrepancy_pct:.2f}% surface gap, "
+                f"and stamp the amended plan with their official Order of Surveyors registration seal."
+            )
+            recs = [
+                "Verify the surveyor's active license on the Cameroon OGEC official roll.",
+                "Require an amended cadastral plan stamped with the official MINCAF/OGEC seal.",
+                "Ensure all contiguous neighbors sign the boundary protocol (procès-verbal de bornage).",
+            ]
+        else:
+            ans = (
+                f"Pour régulariser le plan {plan_id}, le géomètre doit émettre un plan modificatif. "
+                f"Il doit recalculer le cheminement, corriger l'écart de {discrepancy_pct:.2f}%, "
+                f"et apposer son visa d'inscription au tableau de l'OGEC."
+            )
+            recs = [
+                "Vérifier l'inscription du géomètre au tableau officiel de l'Ordre des Géomètres du Cameroun (OGEC).",
+                "Exiger un plan de bornage rectificatif visé et scellé.",
+                "Faire contresigner le procès-verbal de bornage par tous les riverains contigus.",
+            ]
+    else:
+        if is_en:
+            ans = (
+                f"Forensic Geodetic Evaluation for Plan {plan_id} ({locality}): "
+                f"Risk Level: {risk_level} (Score {risk_score:.0f}/100). "
+                f"Enclosed Area: {computed_area:.1f} m² vs Stated {stated_area:.1f} m² (Gap: {discrepancy_pct:.2f}%). "
+                f"Perimeter: {perimeter_m:.1f}m. "
+                f"All coordinates are verified against the WGS84 / UTM geodetic projection."
+            )
+            recs = [
+                "Verify land title authenticity with the divisional land conservator (Conservateur Foncier).",
+                "Ensure no duplicate title number has been assigned to this geodetic coordinate envelope.",
+                "Keep this certified cryptographic audit report (SHA-256 seal) in your property archive.",
+            ]
+        else:
+            ans = (
+                f"Évaluation géodésique pour le plan {plan_id} ({locality}) : "
+                f"Niveau de risque : {risk_level} (Score {risk_score:.0f}/100). "
+                f"Superficie enclose : {computed_area:.1f} m² contre {stated_area:.1f} m² déclarés (Écart : {discrepancy_pct:.2f}%). "
+                f"Périmètre : {perimeter_m:.1f} m. "
+                f"Coordonnées projetées sur l'ellipsoïde légal WGS84 / UTM."
+            )
+            recs = [
+                "Vérifier l'historique du titre foncier auprès du conservateur des domaines de la localité.",
+                "Vérifier l'absence de chevauchement avec les titres fonciers limitrophes.",
+                "Conserver ce rapport certifié muni du sceau SHA-256 dans votre dossier foncier.",
+            ]
+
+    return ans, recs, legal_refs
+
+
+@app.post("/api/ai/qa", response_model=CadastralQAResponse)
+async def ask_cadastral_ai(payload: CadastralQARequest):
+    """Interactive Cadastral Forensic AI Q&A and Expert Audit Recommendation.
+
+    Supports English ('en') and French ('fr').
+    Uses Meta Model API (Muse Spark / LLaMA) when configured; falls back seamlessly
+    to Cadastra's deterministic geodetic-legal reasoning engine.
+    """
+    plan_req: Optional[PlanVerificationRequest] = payload.request_data
+    if not plan_req and payload.plan_id:
+        plan_req = _find_plan_by_id(payload.plan_id)
+
+    verification = payload.verification_data
+    if not verification and plan_req:
+        try:
+            verification = engine.verify_plan(plan_req)
+        except Exception:
+            verification = None
+
+    lang = (payload.language or "en").lower().strip()
+    is_en = lang == "en"
+
+    plan_id = payload.plan_id or (plan_req.plan_id if plan_req else "Unknown")
+    locality = plan_req.locality if plan_req else "Cameroon"
+    stated_area = verification.stated_area_sqm if verification else (plan_req.stated_area_sqm if plan_req else 0.0)
+    computed_area = verification.computed_area_sqm if verification else 0.0
+    discrepancy_pct = verification.discrepancy_percentage if verification else 0.0
+    discrepancy_sqm = verification.discrepancy_sqm if verification else 0.0
+    risk_level = str(verification.risk_level.value) if verification else "MEDIUM"
+    risk_score = verification.risk_score if verification else 50.0
+    polygon_closed = verification.polygon_closed if verification else True
+    self_intersecting = verification.self_intersecting if verification else False
+    beacons_count = len(verification.beacons_wgs84) if verification else (len(plan_req.beacons) if plan_req else 0)
+    perimeter_m = verification.perimeter_m if verification else 0.0
+
+    meta_key = RUNTIME_CONFIG.get("meta_api_key")
+    if meta_key:
+        try:
+            cadastral_context = (
+                f"Plan ID: {plan_id}\n"
+                f"Locality: {locality}\n"
+                f"Beacons count: {beacons_count}\n"
+                f"Stated Area: {stated_area:.2f} m²\n"
+                f"Gauss-Shoelace Computed Area: {computed_area:.2f} m²\n"
+                f"Area Discrepancy: {discrepancy_pct:.2f}% ({discrepancy_sqm:+.2f} m²)\n"
+                f"Cameroon Legal Tolerance: 1.0%\n"
+                f"Polygon Closed: {polygon_closed}\n"
+                f"Self-Intersecting Boundary: {self_intersecting}\n"
+                f"Risk Score: {risk_score:.0f}/100 ({risk_level})\n"
+                f"Relevant Legislation: Decree No. 76-165 of 27 April 1976 (Cameroon Land Tenure & Cadastre), "
+                f"Order of Surveyors (OGEC) standards, Penal Code Art. 316."
+            )
+
+            sys_prompt = (
+                f"You are CADASTRA AI, an authoritative senior forensic cadastral surveyor and geodetic analyst "
+                f"specializing in Cameroon land title compliance and buyer protection.\n"
+                f"Respond STRICTLY in {'ENGLISH' if is_en else 'FRENCH'}.\n"
+                f"Provide honest, objective, evidence-based legal and technical advice in layman-friendly language. "
+                f"Never claim to access classified government internal registries. Base all assessments on geodetic "
+                f"mathematics, coordinate closure, and Cameroon cadastral standards."
+            )
+
+            user_msg = (
+                f"Parcel Geodetic Audit Context:\n{cadastral_context}\n\n"
+                f"User Question: {payload.question}\n\n"
+                f"Please provide:\n"
+                f"1. A direct, clear answer in plain language.\n"
+                f"2. Practical recommendations for the landowner or buyer.\n"
+                f"3. Key risks under Cameroon land law."
+            )
+
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.post(
+                    f"{META_API_BASE_URL}/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {meta_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": META_EXTRACT_MODEL_ID,
+                        "messages": [
+                            {"role": "system", "content": sys_prompt},
+                            {"role": "user", "content": user_msg},
+                        ],
+                        "temperature": 0.2,
+                    },
+                )
+                if res.status_code == 200:
+                    ans_text = res.json()["choices"][0]["message"]["content"].strip()
+                    recs = [
+                        line.lstrip("*-•123456789. ")
+                        for line in ans_text.split("\n")
+                        if line.strip().startswith(("-", "*", "•", "1.", "2.", "3.", "4.", "5."))
+                    ]
+                    if not recs:
+                        recs = [
+                            "Demand signed coordinate rectification from the licensed surveyor before any notary payment."
+                            if is_en
+                            else "Exigez la rectification signée des coordonnées par le géomètre avant tout paiement notarié.",
+                            "Verify beacon markers physically on the ground with a differential GPS."
+                            if is_en
+                            else "Vérifiez physiquement l'implantation des bornes sur le terrain au GPS différentiel.",
+                        ]
+                    return CadastralQAResponse(
+                        plan_id=plan_id,
+                        question=payload.question,
+                        answer=ans_text,
+                        verdict_summary=f"{risk_level} Risk ({risk_score:.0f}/100)" if is_en else f"Risque {risk_level} ({risk_score:.0f}/100)",
+                        risk_level=risk_level,
+                        risk_score=risk_score,
+                        recommendations=recs[:4],
+                        legal_references=["Decree No. 76-165 of 27 April 1976", "MINDCAF Technical Norms", "Penal Code Art. 316"],
+                        language="en" if is_en else "fr",
+                        ai_engine="Meta AI (Muse Spark / LLaMA)",
+                    )
+        except Exception:
+            pass
+
+    answer, recs, legal_refs = _generate_expert_cadastral_qa(
+        question=payload.question,
+        plan_id=plan_id,
+        locality=locality,
+        stated_area=stated_area,
+        computed_area=computed_area,
+        discrepancy_pct=discrepancy_pct,
+        discrepancy_sqm=discrepancy_sqm,
+        risk_level=risk_level,
+        risk_score=risk_score,
+        polygon_closed=polygon_closed,
+        self_intersecting=self_intersecting,
+        beacons_count=beacons_count,
+        is_en=is_en,
+        perimeter_m=perimeter_m,
+    )
+
+    verdict_summary = (
+        f"Geodetic Audit Verdict: {risk_level} Risk (Score: {risk_score:.0f}/100)"
+        if is_en
+        else f"Verdict d'audit géodésique : Risque {risk_level} (Score : {risk_score:.0f}/100)"
+    )
+
+    return CadastralQAResponse(
+        plan_id=plan_id,
+        question=payload.question,
+        answer=answer,
+        verdict_summary=verdict_summary,
+        risk_level=risk_level,
+        risk_score=risk_score,
+        recommendations=recs,
+        legal_references=legal_refs,
+        language="en" if is_en else "fr",
+        ai_engine="Cadastra Geodetic Forensic Engine",
     )

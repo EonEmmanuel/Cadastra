@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { gsap } from "gsap";
 import { PlanVerificationRequest, PlanExtractionPreview } from "@/types/cadastre";
 import { apiFetch } from "@/utils/api";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface LandingHeroProps {
   onPlanLoaded: (
@@ -41,6 +42,7 @@ export default function LandingHero({
   onOpenWhatsAppModal,
   onOpenApiSettings,
 }: LandingHeroProps) {
+  const { t, language, setLanguage, isEn } = useLanguage();
   const [promptText, setPromptText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -438,12 +440,12 @@ export default function LandingHero({
       <header className="hero-anim-header relative z-20 w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center bg-white/[0.04] backdrop-blur-md">
-            <div className="w-4 h-4 rounded-full border border-[#60A5FA]/70 flex items-center justify-center">
+            <div className="w-4 h-4 rounded-full border border-[#00DF8F]/70 flex items-center justify-center">
               <div className="w-1.5 h-1.5 rounded-full bg-white" />
             </div>
           </div>
           <span className="text-sm font-semibold tracking-tight text-white uppercase font-sans">
-            CADASTRA<span className="text-[#60A5FA] ml-1 font-mono text-xs">CM</span>
+            CADASTRA<span className="text-[#00DF8F] ml-1 font-mono text-xs">CM</span>
           </span>
         </div>
 
@@ -453,38 +455,66 @@ export default function LandingHero({
             onClick={onOpenManualModal}
             className="hover:text-white transition-colors"
           >
-            Géodésie UTM
+            {t.navGeodesy}
           </button>
           <button
             type="button"
             onClick={() => handleLoadSample("douala_yassa_utm32n.json")}
             className="hover:text-white transition-colors"
           >
-            Plan de bornage
+            {t.navSurveyPlan}
           </button>
           <button
             type="button"
             onClick={onOpenWhatsAppModal}
             className="hover:text-white transition-colors"
           >
-            WhatsApp API
+            {t.navWhatsApp}
           </button>
           <button
             type="button"
             onClick={onOpenApiSettings}
             className="hover:text-white transition-colors"
           >
-            Muse Spark
+            {t.navMuseSpark}
           </button>
         </nav>
 
         <div className="flex items-center gap-3">
+          {/* EN | FR Segmented Language Switcher */}
+          <div className="flex items-center rounded-md bg-white/[0.05] p-0.5 border border-white/[0.08]">
+            <button
+              type="button"
+              onClick={() => setLanguage("en")}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-sm transition ${
+                language === "en"
+                  ? "bg-[#00DF8F] text-zinc-950 shadow-sm"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              title="English interface & Meta AI analysis"
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage("fr")}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-sm transition ${
+                language === "fr"
+                  ? "bg-[#00DF8F] text-zinc-950 shadow-sm"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              title="Interface & analyse Meta AI en français"
+            >
+              FR
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onOpenApiSettings}
             className="hidden sm:inline-flex text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-full transition"
           >
-            Clés API
+            {t.btnApiKeys}
           </button>
           <motion.button
             whileHover={{ scale: 1.04 }}
@@ -493,7 +523,7 @@ export default function LandingHero({
             onClick={onOpenDashboard}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.14] text-white border border-white/[0.12] backdrop-blur-md transition-all active:scale-95"
           >
-            <span>Ouvrir la Carte</span>
+            <span>{t.navDashboard}</span>
           </motion.button>
         </div>
       </header>
@@ -501,11 +531,10 @@ export default function LandingHero({
       {/* Hero content */}
       <main className="relative z-10 w-full max-w-4xl mx-auto px-6 pt-10 pb-16 flex flex-col items-center text-center my-auto">
         <h1 className="hero-anim-title text-4xl sm:text-[3.6rem] font-bold tracking-[-0.03em] text-white leading-[1.1] max-w-3xl">
-          Audit Foncier &amp; Vérification Cadastrale
+          {t.heroTitle}
         </h1>
         <p className="hero-anim-subtitle mt-4 text-sm text-zinc-400 max-w-lg mx-auto leading-relaxed font-normal">
-          Moteur géodésique autonome pour la vérification de plans de bornage et
-          la détection de superficies fictives au Cameroun.
+          {t.heroSubtitle}
         </p>
 
         {/* Hidden file inputs */}
@@ -577,7 +606,7 @@ export default function LandingHero({
               onChange={(e) => setPromptText(e.target.value)}
               onKeyDown={handleKeyDown}
               rows={3}
-              placeholder="Entrez des coordonnées UTM, un identifiant de dossier, ou déposez une photo / PDF du plan..."
+              placeholder={t.inputPlaceholder}
               className="w-full bg-transparent text-zinc-900 placeholder:text-zinc-400 text-sm sm:text-base font-normal outline-none resize-none leading-relaxed"
             />
           )}
@@ -598,7 +627,7 @@ export default function LandingHero({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={previewUrl}
-                    alt="Aperçu du document"
+                    alt={isEn ? "Document preview" : "Aperçu du document"}
                     className="w-full object-contain max-h-56"
                   />
                 )}
@@ -623,8 +652,8 @@ export default function LandingHero({
                       className="absolute inset-x-0 h-[3px] pointer-events-none z-10"
                       style={{
                         background:
-                          "linear-gradient(90deg, transparent 0%, #3B82F6 40%, #60A5FA 50%, #3B82F6 60%, transparent 100%)",
-                        boxShadow: "0 0 16px 4px rgba(59,130,246,0.6)",
+                          "linear-gradient(90deg, transparent 0%, rgba(0,223,143,0.3) 40%, #00DF8F 50%, rgba(0,223,143,0.3) 60%, transparent 100%)",
+                        boxShadow: "0 0 16px 3px rgba(0,223,143,0.4)",
                       }}
                       initial={{ top: "0%" }}
                       animate={{ top: ["0%", "100%", "0%"] }}
@@ -638,7 +667,7 @@ export default function LandingHero({
                     <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-t from-black/60 to-transparent">
                       <Loader2 className="w-3.5 h-3.5 text-blue-300 animate-spin" />
                       <span className="text-[11px] text-blue-200 font-mono tracking-wide">
-                        Analyse en cours...
+                        {t.scanningOverlay}
                       </span>
                     </div>
                   </>
@@ -660,7 +689,7 @@ export default function LandingHero({
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50"
               >
                 <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                <span>Image (PNG, JPG)</span>
+                <span>{t.btnImagePicker}</span>
               </motion.button>
 
               {/* PDF picker */}
@@ -673,7 +702,7 @@ export default function LandingHero({
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition disabled:opacity-50"
               >
                 <FileText className="w-3.5 h-3.5 text-red-600" />
-                <span>Document PDF</span>
+                <span>{t.btnPdfPicker}</span>
               </motion.button>
 
               {/* WhatsApp */}
@@ -685,7 +714,7 @@ export default function LandingHero({
                 className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                <span>WhatsApp API</span>
+                <span>{t.navWhatsApp}</span>
               </motion.button>
 
               {/* Manual entry */}
@@ -697,7 +726,7 @@ export default function LandingHero({
                 className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-zinc-100 hover:bg-zinc-200/90 text-zinc-800 border border-zinc-200 shadow-xs transition"
               >
                 <Compass className="w-3.5 h-3.5 text-zinc-600" />
-                <span>Saisie Manuelle</span>
+                <span>{t.btnManualInput}</span>
               </motion.button>
             </div>
 
@@ -713,11 +742,11 @@ export default function LandingHero({
               {isProcessing ? (
                 <>
                   <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  <span>Analyse IA...</span>
+                  <span>{t.btnAnalyzing}</span>
                 </>
               ) : (
                 <>
-                  <span>Auditer le plan</span>
+                  <span>{t.btnAuditSubmit}</span>
                   <ArrowUp className="w-3.5 h-3.5 text-white stroke-[2.5]" />
                 </>
               )}
@@ -745,7 +774,7 @@ export default function LandingHero({
                     }
                     className="underline hover:text-white transition"
                   >
-                    Tester un plan conforme
+                    {isEn ? "Test compliant plan" : "Tester un plan conforme"}
                   </button>
                   <span className="text-zinc-500">·</span>
                   <button
@@ -753,7 +782,7 @@ export default function LandingHero({
                     onClick={onOpenManualModal}
                     className="underline hover:text-white transition"
                   >
-                    Saisie manuelle
+                    {isEn ? "Manual input" : "Saisie manuelle"}
                   </button>
                 </div>
               </div>
@@ -762,9 +791,8 @@ export default function LandingHero({
         </AnimatePresence>
 
         {/* Neutral capability badge — no government claim */}
-        <p className="hero-anim-trust mt-5 text-[11px] font-mono text-zinc-500 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#60A5FA]" />
-          <span>Outil indépendant de vérification géodésique · Calcul UTM/WGS84</span>
+        <p className="hero-anim-trust mt-5 text-[11px] font-mono text-zinc-500 flex items-center justify-center">
+          <span>{t.independentTrustBadge}</span>
         </p>
 
         {/* Quick-load sample chips */}
@@ -776,7 +804,7 @@ export default function LandingHero({
             onClick={() => handleLoadSample("douala_yassa_utm32n.json")}
             className="px-3.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-zinc-300 hover:text-white transition"
           >
-            Douala Yassa (980 m² · Conforme)
+            {t.sampleDoualaYassa}
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.03 }}
@@ -787,7 +815,7 @@ export default function LandingHero({
             }
             className="px-3.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-zinc-300 hover:text-white transition"
           >
-            Alerte Fraude (+53% Fictive)
+            {t.sampleFraudAlert}
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.03 }}
@@ -796,15 +824,15 @@ export default function LandingHero({
             onClick={() => handleLoadSample("yaounde_odza_utm32n.json")}
             className="px-3.5 py-1.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-zinc-300 hover:text-white transition"
           >
-            Yaoundé Odza (2 100 m² · 5 bornes)
+            {t.sampleYaoundeOdza}
           </motion.button>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-500 font-mono border-t border-white/[0.06]">
-        <span>CADASTRA CM · META GLOBAL AI DEVELOPER HACKATHON 2026</span>
-        <span className="mt-1 sm:mt-0">MUSE SPARK 1.3 &amp; SAM 3.1 · GÉODÉSIE CAMEROUN</span>
+        <span>{t.footerHackathon}</span>
+        <span className="mt-1 sm:mt-0">{t.footerGeodesy}</span>
       </footer>
     </div>
   );

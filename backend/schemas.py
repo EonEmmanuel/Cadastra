@@ -124,3 +124,24 @@ class WhatsAppVerificationResponse(BaseModel):
     # WhatsApp Cloud API send endpoint (None / False in local dev without keys).
     cloud_api_text_sent: Optional[bool] = None
     cloud_api_document_sent: Optional[bool] = None
+
+
+class CadastralQARequest(BaseModel):
+    plan_id: str = Field(..., description="ID or title number of the cadastral plan")
+    question: str = Field(..., description="User question for the cadastral forensic AI")
+    language: str = Field("en", description="Target response language ('en' or 'fr')")
+    request_data: Optional[PlanVerificationRequest] = None
+    verification_data: Optional[PlanVerificationResponse] = None
+
+
+class CadastralQAResponse(BaseModel):
+    plan_id: str
+    question: str
+    answer: str
+    verdict_summary: str
+    risk_level: str
+    risk_score: float
+    recommendations: List[str]
+    legal_references: List[str]
+    language: str
+    ai_engine: str

@@ -20,7 +20,7 @@ export function WorkspaceHeader({
   return (
     <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <span className="font-mono text-xs uppercase tracking-wider text-[#93C5FD]">
+        <span className="text-xs font-medium text-zinc-400">
           {eyebrow}
         </span>
         <h1 className="mt-1.5 text-xl font-bold tracking-tight text-white sm:text-2xl">
@@ -76,7 +76,7 @@ export function EmptyState({
         </div>
       )}
       {footnote && (
-        <p className="mt-6 font-mono text-xs uppercase tracking-wider text-zinc-500">
+        <p className="mt-6 text-xs text-zinc-500">
           {footnote}
         </p>
       )}
@@ -100,8 +100,8 @@ export function StatTile({ label, value, detail, tone = "neutral" }: StatTilePro
   }[tone];
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-[#040711]/70 backdrop-blur-md px-4 py-3.5">
-      <span className="font-mono text-xs uppercase tracking-wider text-zinc-400 font-medium">
+    <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] px-4 py-3.5">
+      <span className="text-xs font-medium text-zinc-400">
         {label}
       </span>
       <div className={`mt-1.5 font-mono text-2xl font-bold tracking-tight ${toneClass}`}>
@@ -122,10 +122,10 @@ export function RowAction({ onClick, label }: RowActionProps) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-[#60A5FA]/40 hover:bg-[#60A5FA]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60A5FA]/40"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
     >
       {label}
-      <ArrowUpRight className="h-3.5 w-3.5 text-[#60A5FA]" />
+      <ArrowUpRight className="h-3.5 w-3.5 text-zinc-400" />
     </button>
   );
 }

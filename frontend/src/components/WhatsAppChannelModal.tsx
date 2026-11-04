@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Terminal,
 } from "lucide-react";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface WhatsAppChannelModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export default function WhatsAppChannelModal({
   onClose,
   apiBaseUrl,
 }: WhatsAppChannelModalProps) {
+  const { t, isEn } = useLanguage();
   const [copiedSample, setCopiedSample] = useState(false);
   const [customMsg, setCustomMsg] = useState(
     "Vérifier coordonnées géodésiques: B1: 583420, 446100 B2: 583455, 446100 B3: 583455, 446072 B4: 583420, 446072 surface: 980 m2"
@@ -125,10 +127,10 @@ export default function WhatsAppChannelModal({
               </div>
               <div>
                 <h3 id="whatsapp-channel-title" className="text-sm font-display font-bold text-white tracking-tight">
-                  Canal WhatsApp Terrain (Meta Cloud API)
+                  {t.whatsappModalTitle}
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Protocole de vérification cadastrale directe sur smartphone
+                  {t.whatsappModalSubtitle}
                 </p>
               </div>
             </div>
@@ -145,8 +147,8 @@ export default function WhatsAppChannelModal({
           {/* Workflow Tonal Cards (Zero Lines) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
             <div className="p-4 rounded-2xl bg-white/[0.02] space-y-1">
-              <span className="font-mono text-[10px] text-[#00DF8F] font-bold block tracking-wider">
-                01. LEVÉ TERRAIN
+              <span className="font-mono text-[10px] text-[#00DF8F] font-bold block">
+                01. Levé terrain
               </span>
               <p className="text-white font-medium">Capture des Bornes</p>
               <p className="text-zinc-400 text-[11px] leading-relaxed">
@@ -155,8 +157,8 @@ export default function WhatsAppChannelModal({
             </div>
 
             <div className="p-4 rounded-2xl bg-white/[0.02] space-y-1">
-              <span className="font-mono text-[10px] text-[#00DF8F] font-bold block tracking-wider">
-                02. MOTEUR GEODÉSIQUE
+              <span className="font-mono text-[10px] text-[#00DF8F] font-bold block">
+                02. Moteur géodésique
               </span>
               <p className="text-white font-medium">Contrôle Autonome</p>
               <p className="text-zinc-400 text-[11px] leading-relaxed">
@@ -165,8 +167,8 @@ export default function WhatsAppChannelModal({
             </div>
 
             <div className="p-4 rounded-2xl bg-white/[0.02] space-y-1">
-              <span className="font-mono text-[10px] text-[#60A5FA] font-bold block tracking-wider">
-                03. CERTIFICAT GÉODÉSIQUE
+              <span className="font-mono text-[10px] text-[#00DF8F] font-bold block">
+                03. Certificat géodésique
               </span>
               <p className="text-white font-medium">Rapport PDF SHA-256</p>
               <p className="text-zinc-400 text-[11px] leading-relaxed">

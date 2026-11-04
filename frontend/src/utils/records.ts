@@ -58,7 +58,7 @@ export function getSourceLabel(source: VerificationSource): string {
 
 export function formatRecordDate(iso: string): string {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "short",
